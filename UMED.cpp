@@ -23,6 +23,7 @@ class environment;
 class Point_of_Interest;
 class agent;
 class policy;
+class observation;
 class scoreboard;
 class parameters;
 
@@ -56,15 +57,18 @@ public:
     vehicle V;
     int id;
     vector<policy> policies;
-    vector<double> my_obs_distance; /// best observations of each POI
-    vector<double> others_obs_distance;
+    
+    vector<observation> my_observations; /// 1 x POIs
+    vector< vector<observation> > others_observations; /// agents x POIs
+
     vector<bool> comms_P2P_available;
     int active_policy_index;
     
     /// functions to initialize.
     void init(parameters* pPar);
-    void init_obs_distance(parameters* pPar); /// TODO
+    void init_obs_distance(parameters* pPar);
     void start_generation();
+    void start_simulation(parameters* pPar);
     void select_fresh_policy();
     
     void observe_poi_distances(environment* pE,parameters* pPar);
@@ -86,6 +90,13 @@ public:
     
     int times_selected;
     bool active;
+};
+
+class observation{
+public:
+    double observation_distance;
+    int observer_id;
+    observation(double d, int id);
 };
 
 class environment{
@@ -135,7 +146,8 @@ public:
     const int GENERATIONS = 100;
     const bool allow_general_comm_link = false;
     
-    const double P2P_commlink_dist = 3;
+    const double P2P_commlink_dist = 300;
+    const double maximum_observation_distance = 100;
     
     void init();
 };
@@ -158,20 +170,36 @@ void agent::init(parameters* pPar){
     static double x;
     id = x;
     x++;
+    
 }
 void agent::init_obs_distance(parameters* pPar){
-    /// TODO
+    double DBL_MAX = std::numeric_limits<double>::max();
+    my_observations.clear();
+    others_observations.clear();
     for(int p = 0; p<pPar->num_POI; p++){
-        double DBL_MAX = std::numeric_limits<double>::max();
-        my_obs_distance.push_back(DBL_MAX);
-        others_obs_distance.push_back(DBL_MAX);
+        observation my(DBL_MAX, id);
+        my_observations.push_back(my);
     }
+    for(int a=0; a<pPar->num_agents; a++){
+        vector<observation> otherv;
+        for(int p=0; p<pPar->num_POI; p++){
+            observation other(DBL_MAX, -1);
+            otherv.push_back(other);
+        }
+        others_observations.push_back(otherv);
+    }
+    assert(my_observations.size() == pPar->num_POI);
+    assert(others_observations.size() == pPar->num_agents);
+    assert(others_observations.at(0).size() == pPar->num_POI);
 }
 void agent::start_generation(){
     for(int p=0; p<policies.size(); p++){
         policies.at(p).start_generation();
     }
     active_policy_index = -1;
+}
+void agent::start_simulation(parameters* pPar){
+    init_obs_distance(pPar);
 }
 void agent::select_fresh_policy(){
     /// selects a random policy that has not been selected this generation:
@@ -195,15 +223,22 @@ void agent::observe_poi_distances(environment* pE, parameters* pPar){
         double dely = V.y - pE->POIs.at(p).y;
         double delz = V.z - pE->POIs.at(p).z;
         double dist = sqrt(delx * delx + dely * dely + delz * delz);
-        if(dist < my_obs_distance.at(p)){
-            my_obs_distance.at(p) = dist;
+        if(dist > pPar->maximum_observation_distance){
+            continue;
+        }
+        if(dist < my_observations.at(p).observation_distance){
+            my_observations.at(p).observation_distance = dist;
+            my_observations.at(p).observer_id = id;
         }
     }
 }
 void agent::establish_comms_links(vector<agent>* pA, parameters* pPar){
+    comms_P2P_available.clear();
+    comms_P2P_available.reserve(pPar->num_agents);
     for(int a=0; a<pPar->num_agents; a++){
         if(a == id){
             comms_P2P_available.push_back(false);
+            continue;
         }
         double delx = V.x - pA->at(a).V.x;
         double dely = V.x - pA->at(a).V.y;
@@ -217,13 +252,38 @@ void agent::establish_comms_links(vector<agent>* pA, parameters* pPar){
         }
     }
     assert(comms_P2P_available.size() == pPar->num_agents);
+    assert(comms_P2P_available.at(id) == false);
 }
 void agent::exchange_information_P2P(vector<agent>* pA, parameters* pPar){
-    /// TODO
+    /// talking to agent "a".
     for(int a=0; a<pPar->num_agents; a++){
-        for(int p = 0; p<pPar->num_POI; p++){
-            
+        if(comms_P2P_available.at(a) == false){
+            continue;
         }
+        /// if the comms link is available...
+        for(int p = 0; p<pPar->num_POI; p++){
+            /// update my observations for every POI into the agent a's database.
+            if(my_observations.at(p).observation_distance < pA->at(a).others_observations.at(id).at(p).observation_distance){
+                pA->at(a).others_observations.at(id).at(p).observation_distance = my_observations.at(p).observation_distance;
+                pA->at(a).others_observations.at(id).at(p).observer_id = id;
+            }
+        }
+        /// update my knowledge of every other "b" agent into a's database database.
+        for(int b=0; b<pPar->num_agents; b++){
+            if(b==a){
+                // but don't bother telling b about a if b is a.
+                continue;
+            }
+            for(int p=0; p<pPar->num_POI; p++){
+                if(others_observations.at(b).at(p).observation_distance < pA->at(a).others_observations.at(b).at(p).observation_distance){
+                    pA->at(a).others_observations.at(b).at(p).observation_distance = others_observations.at(a).at(p).observation_distance;
+                    pA->at(a).others_observations.at(b).at(p).observer_id = others_observations.at(a).at(p).observer_id;
+                }
+            }
+        }
+        /// the following two happen during the other running this function:
+            /// update the other's observations into my database.
+            /// update the other's knowledge of other's into my database.
     }
 }
 /////// END AGENT FUNCTIONS ///////
@@ -252,6 +312,13 @@ void policy::start_generation(){
     active = false;
 }
 /////// END Policy FUNCTIONS ///////
+
+/////// BGN Observation FUNCTIONS ///////
+observation::observation(double d, int i){
+    observation_distance = d;
+    observer_id = i;
+}
+/////// END Observation FUNCTIONS ///////
 
 /////// BGN VEHICLE FUNCTIONS ///////
 void vehicle::init(){
@@ -379,19 +446,19 @@ void parameters::init(){
 ///////////////////// %%%%%%%%%%%%%%%%%% END CLASS FUNCTIONS %%%%%%%%%%%%%%%%%% /////////////////////
 
 void stat_run(vector<agent>*pA,environment* pE,parameters* pPar);
-void single_generation(vector<agent>*pA,environment* pE,parameters* pPar,int gen);
+void single_generation(vector<agent>*pA,environment* pE,parameters* pPar,int SR,int gen);
 void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar);
 void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum);
 
 void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR){
     cout << "STAT RUN\t\t" << SR << endl;
     for(int gen = 0; gen<pPar->GENERATIONS; gen++){
-        single_generation(pA,pE,pPar,gen);
+        single_generation(pA,pE,pPar,SR,gen);
     }
 }
 
-void single_generation(vector<agent>*pA,environment* pE,parameters* pPar,int gen){
-    cout << "GENERATION\t" << gen << endl;
+void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen){
+    cout << "GENERATION\t" << SR << " :: " << gen << endl;
     for(int a=0; a<pPar->num_agents; a++){
         pA->at(a).start_generation();
     }
@@ -410,9 +477,10 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar){
         int dex = pA->at(a).active_policy_index;
         policy P = pA->at(a).policies.at(dex);
         pA->at(a).V.start_based_on_policy(P,pPar->num_agents);
+        pA->at(a).start_simulation(pPar);
     }
     /// vehicles at starting position.
-    for(int ts = 0; ts<pPar->num_waypoints; ts++){
+    for(int ts = 1; ts<pPar->num_waypoints; ts++){
         advance(pA,pE,pPar,ts);
     }
 }
@@ -424,7 +492,9 @@ void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum){
         pA->at(a).V.move_to_wp(P,wpnum);
     }
     for(int a=0; a<pPar->num_agents; a++){
+        pA->at(a).observe_poi_distances(pE,pPar);
         pA->at(a).establish_comms_links(pA,pPar);
+        pA->at(a).exchange_information_P2P(pA,pPar);
     }
 }
 
