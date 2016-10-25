@@ -14,6 +14,11 @@ using namespace std;
 /// uniform random between lower and upper bounds.
 #define uniform_random(low,up) ((double)rand()/RAND_MAX*(up-low) + low)
 
+/// max function
+double max(double a, double b){
+    if(a>b){return a;}
+    return b;
+}
 
 ///////////////////// %%%%%%%%%%%%%%%%%% BEGIN CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
 
@@ -75,6 +80,13 @@ public:
     void establish_comms_links(vector<agent>* pA,parameters* pPar);
     void exchange_information_P2P(vector<agent>* pA,parameters* pPar);
     void exchange_information_general(parameters* pPar);
+    
+    void calc_local(vector<agent>* pA, environment* pE, parameters* pPar);
+    void calc_true_global(vector<agent>* pA, environment* pE, parameters* pPar);
+    void calc_limited_global(vector<agent>* pA, environment* pE, parameters* pPar);
+    void calc_true_difference(vector<agent>* pA, environment* pE, parameters* pPar);
+    void calc_limited_difference(vector<agent>* pA, environment* pE, parameters* pPar);
+    
 };
 
 class policy{
@@ -84,8 +96,9 @@ public:
     
     void start_generation();
     double local;
-    double global;
+    double true_global;
     double true_difference;
+    double limited_global;
     double limited_difference;
     
     int times_selected;
@@ -286,6 +299,138 @@ void agent::exchange_information_P2P(vector<agent>* pA, parameters* pPar){
             /// update the other's knowledge of other's into my database.
     }
 }
+void agent::calc_local(vector<agent>* pA, environment* pE, parameters* pPar){
+    policies.at(active_policy_index).local = 0;
+    for(int p=0; p<pPar->num_POI; p++){
+        double value = pE->POIs.at(p).val;
+        double delta = max(1.0,my_observations.at(p).observation_distance);
+        double contribution = value/delta;
+        policies.at(active_policy_index).local+=contribution;
+    }
+    return;
+}
+void agent::calc_true_global(vector<agent>* pA, environment* pE, parameters* pPar){
+    policies.at(active_policy_index).true_global = 0;
+    /// LYLY Note that this is current calculated "agents" times, and does not strictly need to be; the true_global could be calculated once and broadcast.
+    double dis;
+    double g=0;
+    vector<double> closest(pPar->num_POI,std::numeric_limits<double>::max());
+    for(int p=0; p<pPar->num_POI; p++){
+        for(int a=0; a<pPar->num_agents; a++){
+            dis = pA->at(a).my_observations.at(p).observation_distance;
+            if(dis < closest.at(p)){
+                closest.at(p) = dis;
+            }
+        }
+    }
+    
+    double value, delta, contribution;
+    for(int p=0; p<pPar->num_POI; p++){
+        value = pE->POIs.at(p).val;
+        delta = max(1.0,closest.at(p));
+        contribution = value/delta;
+        g+=contribution;
+    }
+    
+    policies.at(active_policy_index).true_global = g;
+    return;
+}
+void agent::calc_limited_global(vector<agent>* pA, environment* pE, parameters* pPar){
+    policies.at(active_policy_index).limited_global = 0;
+    /// TODO use "others observations".
+    double limg;
+    
+    double dis;
+    vector<double> closest(pPar->num_POI,std::numeric_limits<double>::max());
+    for(int p=0; p<pPar->num_POI; p++){
+        /// consider my observations...
+        dis = my_observations.at(p).observation_distance;
+        if(dis < closest.at(p)){
+            closest.at(p) = dis;
+        }
+        /// and everyone else's that i know about...
+        for(int a=0; a<pPar->num_agents; a++){
+            dis = others_observations.at(a).at(p).observation_distance;
+            if(dis < closest.at(p)){
+                closest.at(p) = dis;
+            }
+        }
+    }
+    
+    /// calculated limg based on the closest of all of these.
+    double value, delta, contribution;
+    for(int p=0; p<pPar->num_POI; p++){
+        value = pE->POIs.at(p).val;
+        delta = max(1.0,closest.at(p));
+        contribution = value/delta;
+        limg+=contribution;
+    }
+    
+    policies.at(active_policy_index).limited_global = limg;
+    return;
+}
+void agent::calc_true_difference(vector<agent>* pA, environment* pE, parameters* pPar){
+    policies.at(active_policy_index).true_difference = 0;
+    double true_cf = 0;
+    /// TODO use all agent's "my observations"
+    
+    vector<double> closest(pPar->num_POI,std::numeric_limits<double>::max());
+    double dis;
+    for(int a=0; a<pPar->num_agents; a++){
+    if(a==id){
+        continue;
+    }
+        for(int p=0; p<pPar->num_agents; p++){
+            dis = pA->at(a).my_observations.at(p).observation_distance;
+            if(dis<closest.at(p)){
+                closest.at(p) = dis;
+            }
+        }
+    }
+    
+    /// calculate true_cf based on the closest of these.
+    double value, delta, contribution;
+    for(int p=0; p<pPar->num_POI; p++){
+        value = pE->POIs.at(p).val;
+        delta = max(1.0,closest.at(p));
+        contribution = value/delta;
+        true_cf+=contribution;
+    }
+    
+    policies.at(active_policy_index).true_difference = policies.at(active_policy_index).true_global - true_cf;
+    return;
+}
+void agent::calc_limited_difference(vector<agent>* pA, environment* pE, parameters* pPar){
+    policies.at(active_policy_index).limited_difference = 0;
+    double limited_cf = 0;
+    /// use "others observations.
+    
+    ////////////////////////////////
+    double dis;
+    vector<double> closest(pPar->num_POI,std::numeric_limits<double>::max());
+    for(int p=0; p<pPar->num_POI; p++){
+        /// consider only everyone else's that i know about...
+        for(int a=0; a<pPar->num_agents; a++){
+            dis = others_observations.at(a).at(p).observation_distance;
+            if(dis < closest.at(p)){
+                closest.at(p) = dis;
+            }
+        }
+    }
+    
+    /// calculated limg based on the closest of all of these.
+    double value, delta, contribution;
+    for(int p=0; p<pPar->num_POI; p++){
+        value = pE->POIs.at(p).val;
+        delta = max(1.0,closest.at(p));
+        contribution = value/delta;
+        limited_cf+=contribution;
+    }
+    ////////////////////////////////
+    
+    policies.at(active_policy_index).limited_difference = policies.at(active_policy_index).limited_global - limited_cf;
+    return;
+}
 /////// END AGENT FUNCTIONS ///////
 
 /////// BGN Policy FUNCTIONS ///////
@@ -305,8 +450,9 @@ void policy::init(parameters* pPar){
 }
 void policy::start_generation(){
     local = 0;
-    global = 0;
+    true_global = 0;
     true_difference = 0;
+    limited_global = 0;
     limited_difference = 0;
     times_selected = 0;
     active = false;
@@ -482,6 +628,14 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar){
     /// vehicles at starting position.
     for(int ts = 1; ts<pPar->num_waypoints; ts++){
         advance(pA,pE,pPar,ts);
+    }
+    /// vehicles have advanced through their paths and shared all available information with each other.
+    for(int a=0; a<pPar->num_agents; a++){
+        pA->at(a).calc_local(pA,pE,pPar);
+        pA->at(a).calc_true_global(pA,pE,pPar);
+        pA->at(a).calc_true_difference(pA,pE,pPar);
+        pA->at(a).calc_limited_global(pA,pE,pPar);
+        pA->at(a).calc_limited_difference(pA,pE,pPar);
     }
 }
 
