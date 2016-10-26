@@ -31,6 +31,13 @@ class policy;
 class observation;
 class scoreboard;
 class parameters;
+class testparameters;
+class tests;
+
+void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen);
+void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar);
+void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR);
+void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum);
 
 class vehicle{
 public:
@@ -136,33 +143,48 @@ public:
 
 class parameters{
 public:
-    const int num_agents = 3;
-    const int num_vehicles = num_agents; // 1 vehicle per agent
-    const int num_POI = 5*num_agents;
-    const int pop_size = 100;
-    const int num_waypoints = 10;
+    int num_agents = 3;
+    int num_vehicles = num_agents; // 1 vehicle per agent
+    int num_POI = 5*num_agents;
+    int pop_size = 100;
+    int num_waypoints = 10;
     
-    const double mutation_size = 5.0;
+    double mutation_size = 5.0;
     
-    const double max_x = 100;
-    const double max_y = 100;
-    const double max_z = 10;
+    double max_x = 100;
+    double max_y = 100;
+    double max_z = 10;
     
-    const double min_x = 0;
-    const double min_y = 0;
-    const double min_z = -100;
+    double min_x = 0;
+    double min_y = 0;
+    double min_z = -100;
     
-    const double min_poi_value = 1;
-    const double max_poi_value = 100;
+    double min_poi_value = 1;
+    double max_poi_value = 100;
     
-    const int STAT_RUNS = 3;
-    const int GENERATIONS = 100;
-    const bool allow_general_comm_link = false;
+    int STAT_RUNS = 3;
+    int GENERATIONS = 100;
+    bool allow_general_comm_link = true;
     
-    const double P2P_commlink_dist = 300;
-    const double maximum_observation_distance = 100;
+    double P2P_commlink_dist = 300;
+    double maximum_observation_distance = 100;
     
     void init();
+    void single_agent_test_overwrite();
+};
+
+class tests{
+    vector<agent> A;
+    environment E;
+    parameters P;
+    
+    environment* pE = &E;
+    parameters* pPar = &P;
+    vector<agent>* pA = &A;
+
+public:
+    void init();
+    void single_agent_multi_poi();
 };
 ///////////////////// %%%%%%%%%%%%%%%%%% END CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
 
@@ -180,7 +202,7 @@ void agent::init(parameters* pPar){
     /// create a vector of waypoints for each policy (taken care of in policy.init())
     
     /// give each agent a unique ID;
-    static double x;
+    static int x;
     id = x;
     x++;
     
@@ -581,7 +603,151 @@ void parameters::init(){
     /// This space left intentionally blank.
     /// All parameters are set in the class definition.
 }
+void parameters::single_agent_test_overwrite(){
+    num_agents = 1;
+    num_vehicles = num_agents;
+    pop_size = 1;
+    num_POI = 2;
+    num_waypoints = 4;
+    
+    P2P_commlink_dist = 300;
+    maximum_observation_distance = 100;
+}
 /////// END PARAMETERS FUNCTIONS ///////
+
+/////// BGN TESTS FUNCTIONS ///////
+void tests::init(){
+    P.single_agent_test_overwrite();
+    agent AA;
+    A.push_back(AA);
+}
+void tests::single_agent_multi_poi(){
+    P.init();
+    A.at(0).init(pPar);
+    E.init(pPar);
+    
+    double delta = 0.001;
+    
+    P.maximum_observation_distance = 1;
+    
+    /// ONE AGENT, TWO POIS, WE CARE ABOUT ONE.
+    E.POIs.at(0).x = 10;
+    E.POIs.at(0).y = 10;
+    E.POIs.at(0).z = -10;
+    E.POIs.at(0).val = 100;
+    E.POIs.at(1).x = 90;
+    E.POIs.at(1).y = 90;
+    E.POIs.at(1).z = -90;
+    E.POIs.at(1).val = 100;
+    
+    A.at(0).policies.at(0).WP.at(0).x = 0;
+    A.at(0).policies.at(0).WP.at(0).y = 0;
+    A.at(0).policies.at(0).WP.at(0).z = 0;
+    
+    A.at(0).policies.at(0).WP.at(1).x = 0;
+    A.at(0).policies.at(0).WP.at(1).y = 0;
+    A.at(0).policies.at(0).WP.at(1).z = 0;
+
+    A.at(0).policies.at(0).WP.at(2).x = 0;
+    A.at(0).policies.at(0).WP.at(2).y = 0;
+    A.at(0).policies.at(0).WP.at(2).z = 0;
+    
+    A.at(0).policies.at(0).WP.at(3).x = 0;
+    A.at(0).policies.at(0).WP.at(3).y = 0;
+    A.at(0).policies.at(0).WP.at(3).z = 0;
+    
+    A.at(0).start_generation();
+    A.at(0).start_simulation(pPar);
+    A.at(0).select_fresh_policy();
+    
+    single_simulation(pA,pE,pPar);
+    
+    policy* pPol = &A.at(0).policies.at(0);
+    if(P.maximum_observation_distance > 18){
+    /// local == difference;
+        assert(pPol->local == pPol->true_difference);
+    /// local == global;
+        assert(pPol->local == pPol->true_global);
+    /// ld == difference;
+        assert(pPol->limited_difference == pPol->true_difference);
+    /// lg == global;
+        //assert(pPol->limited_global == pPol->true_global);
+    }
+    else{
+        assert(pPol->local < delta);
+        assert(pPol->true_global < delta);
+        assert(pPol->true_difference < delta);
+        assert(pPol->limited_global < delta);
+        assert(pPol->limited_difference < delta);
+    }
+    
+    double L1 = pPol->local;
+    
+    
+    assert(true);
+    
+    A.at(0).policies.at(0).WP.at(0).x = 0;
+    A.at(0).policies.at(0).WP.at(0).y = 0;
+    A.at(0).policies.at(0).WP.at(0).z = 0;
+    
+    A.at(0).policies.at(0).WP.at(1).x = 10;
+    A.at(0).policies.at(0).WP.at(1).y = 10;
+    A.at(0).policies.at(0).WP.at(1).z = -10;
+    
+    A.at(0).policies.at(0).WP.at(2).x = 0;
+    A.at(0).policies.at(0).WP.at(2).y = 0;
+    A.at(0).policies.at(0).WP.at(2).z = 0;
+    
+    A.at(0).policies.at(0).WP.at(3).x = 0;
+    A.at(0).policies.at(0).WP.at(3).y = 0;
+    A.at(0).policies.at(0).WP.at(3).z = 0;
+    
+    A.at(0).start_generation();
+    A.at(0).start_simulation(pPar);
+    A.at(0).select_fresh_policy();
+    
+    single_simulation(pA,pE,pPar);
+    
+    double L2 = pPol->local;
+    
+    assert(L2 > L1);
+    
+    A.at(0).policies.at(0).WP.at(0).x = 0;
+    A.at(0).policies.at(0).WP.at(0).y = 0;
+    A.at(0).policies.at(0).WP.at(0).z = 0;
+    
+    A.at(0).policies.at(0).WP.at(1).x = 10;
+    A.at(0).policies.at(0).WP.at(1).y = 10;
+    A.at(0).policies.at(0).WP.at(1).z = -10;
+    
+    A.at(0).policies.at(0).WP.at(2).x = 90;
+    A.at(0).policies.at(0).WP.at(2).y = 90;
+    A.at(0).policies.at(0).WP.at(2).z = -90;
+    
+    A.at(0).policies.at(0).WP.at(3).x = 0;
+    A.at(0).policies.at(0).WP.at(3).y = 0;
+    A.at(0).policies.at(0).WP.at(3).z = 0;
+
+    A.at(0).start_generation();
+    A.at(0).start_simulation(pPar);
+    A.at(0).select_fresh_policy();
+    
+    single_simulation(pA,pE,pPar);
+    
+    double L3 = pPol->local;
+    assert(L3 > L2);
+    
+    /// local == difference;
+    assert(pPol->local == pPol->true_difference);
+    /// local == global;
+    assert(pPol->local == pPol->true_global);
+    /// ld == difference;
+    assert(pPol->limited_difference == pPol->true_difference);
+    /// lg == global;
+    assert(pPol->limited_global == pPol->true_global);
+    
+}
+/////// END TESTS FUNCTIONS ///////
 
 /////// BGN OTHER FUNCTIONS ///////
 
@@ -655,6 +821,12 @@ void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum){
 int main() {
     srand((unsigned)time(NULL));
     cout << "Start of Program" << endl;
+    
+    tests T;
+    T.init();
+    T.single_agent_multi_poi();
+    return 0;
+    
     
     parameters P;
     parameters* pPar = &P;
