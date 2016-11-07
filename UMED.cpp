@@ -93,7 +93,7 @@ public:
     void calc_limited_global(vector<agent>* pA, environment* pE, parameters* pPar);
     void calc_true_difference(vector<agent>* pA, environment* pE, parameters* pPar);
     void calc_limited_difference(vector<agent>* pA, environment* pE, parameters* pPar);
-    
+    void LGD_to_fitness(vector<agent>* pA, environment* pE, parameters* pPar);
 };
 
 class policy{
@@ -102,6 +102,7 @@ public:
     void init(parameters* pPar);
     
     void start_generation();
+    double fitness; /// whichever signal we are using to learn
     double local;
     double true_global;
     double true_difference;
@@ -453,6 +454,10 @@ void agent::calc_limited_difference(vector<agent>* pA, environment* pE, paramete
     policies.at(active_policy_index).limited_difference = policies.at(active_policy_index).limited_global - limited_cf;
     return;
 }
+void agent::LGD_to_fitness(vector<agent>* pA, environment* pE, parameters* pPar){
+    policies.at(active_policy_index).fitness = policies.at(active_policy_index).local;
+    /// TODO should indicate this from within the parameters class.
+}
 /////// END AGENT FUNCTIONS ///////
 
 /////// BGN Policy FUNCTIONS ///////
@@ -477,6 +482,7 @@ void policy::start_generation(){
     limited_global = 0;
     limited_difference = 0;
     times_selected = 0;
+    fitness = 0;
     active = false;
 }
 /////// END Policy FUNCTIONS ///////
@@ -782,6 +788,37 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
         /// simulate based on selected policy.
         single_simulation(pA, pE, pPar);
     }
+    /// DOWNSELECT
+    int rand1, rand2;
+    double fit1, fit2;
+    for(int a=0; a<pA->size(); a++){
+        /// for each agent...
+        /// policies / 2 times
+        for(int reduce = 0; reduce<pPar->pop_size/2; reduce++){
+            /// kill a policy by binary selection.
+            rand1 = rand()%pA->at(a).policies.size();
+            rand2 = rand()%pA->at(a).policies.size();
+            while(rand2 == rand1){rand2 = rand()%pA->at(a).policies.size();}
+            /// keep selecting rand2 until they are distinct.
+            fit1 = pA->at(a).policies.at(rand1).fitness;
+            fit2 = pA->at(a).policies.at(rand2).fitness;
+            if(fit1 > fit2){
+                /// kill2
+                pA->erase(pA->begin()+rand2);
+            }
+            else{
+                /// kill1
+                pA->erase(pA->begin()+rand1);
+            }
+        }
+    }
+    /// REPOPULATE
+    /// choose random survivors to repopulate.
+    for(int repop = 0; repop<pPar->pop_size/2; repop++){
+        int spot = rand()%pA->size();
+        pA->push_back(pA->at(spot));
+    }
+    /// should be good to go for next generation at this point.
 }
 
 void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar){
@@ -802,6 +839,7 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar){
         pA->at(a).calc_true_difference(pA,pE,pPar);
         pA->at(a).calc_limited_global(pA,pE,pPar);
         pA->at(a).calc_limited_difference(pA,pE,pPar);
+        pA->at(a).LGD_to_fitness(pA,pE,pPar);
     }
 }
 
@@ -822,10 +860,10 @@ int main() {
     srand((unsigned)time(NULL));
     cout << "Start of Program" << endl;
     
-    tests T;
-    T.init();
-    T.single_agent_multi_poi();
-    return 0;
+    //tests T;
+    //T.init();
+    //T.single_agent_multi_poi();
+    //return 0;
     
     
     parameters P;
