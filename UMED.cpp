@@ -4,6 +4,7 @@
 //  Copyright © 2016 Logan Yliniemi. All rights reserved.
 //
 
+
 #include <iostream>
 
 using namespace std;
@@ -19,6 +20,9 @@ double max(double a, double b){
     if(a>b){return a;}
     return b;
 }
+
+bool test_functions = true;
+bool ak = true;
 
 ///////////////////// %%%%%%%%%%%%%%%%%% BEGIN CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
 
@@ -72,7 +76,7 @@ public:
     
     vector<observation> my_observations; /// 1 x POIs
     vector< vector<observation> > others_observations; /// agents x POIs
-
+    
     vector<bool> comms_P2P_available;
     int active_policy_index;
     
@@ -182,10 +186,12 @@ class tests{
     environment* pE = &E;
     parameters* pPar = &P;
     vector<agent>* pA = &A;
-
+    
 public:
     void init();
     void single_agent_multi_poi();
+    void single_agent_check_waypoints_poi();
+    void multi_agent_check_waypoints_poi();
 };
 ///////////////////// %%%%%%%%%%%%%%%%%% END CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
 
@@ -209,6 +215,7 @@ void agent::init(parameters* pPar){
     
 }
 void agent::init_obs_distance(parameters* pPar){
+    bool VERBOSE = true;
     double DBL_MAX = std::numeric_limits<double>::max();
     my_observations.clear();
     others_observations.clear();
@@ -216,6 +223,11 @@ void agent::init_obs_distance(parameters* pPar){
         observation my(DBL_MAX, id);
         my_observations.push_back(my);
     }
+    
+    if(VERBOSE){
+        cout<<my_observations.at(0).observation_distance<<"\t";
+    }
+    
     for(int a=0; a<pPar->num_agents; a++){
         vector<observation> otherv;
         for(int p=0; p<pPar->num_POI; p++){
@@ -227,6 +239,7 @@ void agent::init_obs_distance(parameters* pPar){
     assert(my_observations.size() == pPar->num_POI);
     assert(others_observations.size() == pPar->num_agents);
     assert(others_observations.at(0).size() == pPar->num_POI);
+    
 }
 void agent::start_generation(){
     for(int p=0; p<policies.size(); p++){
@@ -318,8 +331,8 @@ void agent::exchange_information_P2P(vector<agent>* pA, parameters* pPar){
             }
         }
         /// the following two happen during the other running this function:
-            /// update the other's observations into my database.
-            /// update the other's knowledge of other's into my database.
+        /// update the other's observations into my database.
+        /// update the other's knowledge of other's into my database.
     }
 }
 void agent::calc_local(vector<agent>* pA, environment* pE, parameters* pPar){
@@ -400,9 +413,9 @@ void agent::calc_true_difference(vector<agent>* pA, environment* pE, parameters*
     vector<double> closest(pPar->num_POI,std::numeric_limits<double>::max());
     double dis;
     for(int a=0; a<pPar->num_agents; a++){
-    if(a==id){
-        continue;
-    }
+        if(a==id){
+            continue;
+        }
         for(int p=0; p<pPar->num_agents; p++){
             dis = pA->at(a).my_observations.at(p).observation_distance;
             if(dis<closest.at(p)){
@@ -532,7 +545,7 @@ void waypoint::create_surface(parameters* pPar){
     x = uniform_random(pPar->min_x,pPar->max_x);
     y = uniform_random(pPar->min_y,pPar->max_y);
     z = 0.001;
-
+    
 }
 void waypoint::create_random(parameters* pPar){
     x = uniform_random(pPar->min_x,pPar->max_x);
@@ -543,7 +556,7 @@ void waypoint::mutate(parameters* pPar,bool surf){
     x += uniform_random(-pPar->mutation_size,pPar->mutation_size);
     y += uniform_random(-pPar->mutation_size,pPar->mutation_size);
     if(surf==false){
-    z += uniform_random(-pPar->mutation_size,pPar->mutation_size);
+        z += uniform_random(-pPar->mutation_size,pPar->mutation_size);
     }
     boundaries(pPar);
 }
@@ -653,7 +666,7 @@ void tests::single_agent_multi_poi(){
     A.at(0).policies.at(0).WP.at(1).x = 0;
     A.at(0).policies.at(0).WP.at(1).y = 0;
     A.at(0).policies.at(0).WP.at(1).z = 0;
-
+    
     A.at(0).policies.at(0).WP.at(2).x = 0;
     A.at(0).policies.at(0).WP.at(2).y = 0;
     A.at(0).policies.at(0).WP.at(2).z = 0;
@@ -670,13 +683,13 @@ void tests::single_agent_multi_poi(){
     
     policy* pPol = &A.at(0).policies.at(0);
     if(P.maximum_observation_distance > 18){
-    /// local == difference;
+        /// local == difference;
         assert(pPol->local == pPol->true_difference);
-    /// local == global;
+        /// local == global;
         assert(pPol->local == pPol->true_global);
-    /// ld == difference;
+        /// ld == difference;
         assert(pPol->limited_difference == pPol->true_difference);
-    /// lg == global;
+        /// lg == global;
         //assert(pPol->limited_global == pPol->true_global);
     }
     else{
@@ -733,7 +746,7 @@ void tests::single_agent_multi_poi(){
     A.at(0).policies.at(0).WP.at(3).x = 0;
     A.at(0).policies.at(0).WP.at(3).y = 0;
     A.at(0).policies.at(0).WP.at(3).z = 0;
-
+    
     A.at(0).start_generation();
     A.at(0).start_simulation(pPar);
     A.at(0).select_fresh_policy();
@@ -753,6 +766,135 @@ void tests::single_agent_multi_poi(){
     assert(pPol->limited_global == pPol->true_global);
     
 }
+
+void tests::single_agent_check_waypoints_poi(){
+    bool VERBOSE = false;
+    //Set all the values
+    pPar->num_agents = 1;
+    pPar->num_vehicles = 1;
+    pPar->pop_size =1;
+    pPar->num_POI = 2;
+    pPar->num_waypoints =4;
+    pPar->maximum_observation_distance = 1;
+    pPar->P2P_commlink_dist=1;
+    
+    //Create a agent and initalize its values
+    agent a_1;
+    A.clear();
+    A.push_back(a_1);
+    A.at(0).init(pPar);
+    
+    //Create environment
+    E.init(pPar);
+    
+    double delta = 0.001; // This value is used in calculation of local values
+    
+    /// Create location for POI
+    E.POIs.at(0).x = 10;
+    E.POIs.at(0).y = 10;
+    E.POIs.at(0).z = -10;
+    E.POIs.at(0).val = 100;
+    E.POIs.at(1).x = 90;
+    E.POIs.at(1).y = 90;
+    E.POIs.at(1).z = -90;
+    E.POIs.at(1).val = 100;
+    
+    
+    //Agent location
+    A.at(0).policies.at(0).WP.at(0).x = 0;
+    A.at(0).policies.at(0).WP.at(0).y = 0;
+    A.at(0).policies.at(0).WP.at(0).z = 0;
+    
+    A.at(0).policies.at(0).WP.at(1).x = 10;
+    A.at(0).policies.at(0).WP.at(1).y = 10;
+    A.at(0).policies.at(0).WP.at(1).z = -10;
+    
+    A.at(0).policies.at(0).WP.at(2).x = 90;
+    A.at(0).policies.at(0).WP.at(2).y = 90;
+    A.at(0).policies.at(0).WP.at(2).z = -90;
+    
+    A.at(0).policies.at(0).WP.at(3).x = 0;
+    A.at(0).policies.at(0).WP.at(3).y = 0;
+    A.at(0).policies.at(0).WP.at(3).z = 0;
+    
+    
+    A.at(0).start_generation(); // all policies have everything to zero
+    A.at(0).start_simulation(pPar);
+    A.at(0).select_fresh_policy();
+    A.at(0).V.start_based_on_policy(A.at(0).policies.at(0), pPar->num_agents); //placed at first waypoint
+    
+    for (int temp_1 =0; temp_1<A.at(0).policies.at(0).WP.size(); temp_1++) {
+        int dex = pA->at(0).active_policy_index;
+        policy P = pA->at(0).policies.at(dex);
+        pA->at(0).V.move_to_wp(P,temp_1);
+        
+        assert(A.at(0).policies.at(0).WP.at(temp_1).x == A.at(0).V.x);
+        assert(A.at(0).policies.at(0).WP.at(temp_1).y == A.at(0).V.y);
+        assert(A.at(0).policies.at(0).WP.at(temp_1).z == A.at(0).V.z);
+        
+        if(VERBOSE){
+            cout<<"Location of Agent::"<<endl;
+            cout<<A.at(0).V.x<<"\t"<<A.at(0).V.y<<"\t"<<A.at(0).V.z<<endl;
+            cout<<"Location of POI::"<<endl;
+            cout<<E.POIs.at(0).x<<"\t"<<E.POIs.at(0).y<<"\t"<<E.POIs.at(0).z<<endl;
+            cout<<E.POIs.at(1).x<<"\t"<<E.POIs.at(1).y<<"\t"<<E.POIs.at(1).z<<endl;
+        }
+        
+        pA->at(0).observe_poi_distances(pE,pPar);
+        pA->at(0).establish_comms_links(pA,pPar);
+        pA->at(0).exchange_information_P2P(pA,pPar);
+        
+        if(VERBOSE){
+            cout<<A.at(0).my_observations.at(0).observation_distance<<endl;
+            cout<<A.at(0).my_observations.at(1).observation_distance<<endl;
+        }
+    }
+    //calculate the values
+    for(int a=0; a<pPar->num_agents; a++){
+        pA->at(a).calc_local(pA,pE,pPar);
+        pA->at(a).calc_true_global(pA,pE,pPar);
+        pA->at(a).calc_true_difference(pA,pE,pPar);
+        pA->at(a).calc_limited_global(pA,pE,pPar);
+        pA->at(a).calc_limited_difference(pA,pE,pPar);
+        pA->at(a).LGD_to_fitness(pA,pE,pPar);
+    }
+    //assert to check all values to calculated values
+    if(VERBOSE){
+        cout<<"fitness:"<<A.at(0).policies.at(0).fitness;                         //fitness;
+        cout<<"local::"<<A.at(0).policies.at(0).local;                            //local;
+        cout<<"true_global::"<<A.at(0).policies.at(0).true_global;                //true_global;
+        cout<<"true_difference::"<<A.at(0).policies.at(0).true_difference;            //true_difference;
+        cout<<"limited_global::"<<A.at(0).policies.at(0).limited_global;          //limited_global;
+        cout<<"limited_difference::"<<A.at(0).policies.at(0).limited_difference;  //limited_difference;
+    }
+    
+    assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).local);
+    assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).true_global);
+    assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).true_difference);
+    assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).limited_global );
+    assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).limited_difference);
+    
+    assert(A.at(0).policies.at(0).local == A.at(0).policies.at(0).true_global);
+    assert(A.at(0).policies.at(0).local == A.at(0).policies.at(0).true_difference);
+    assert(A.at(0).policies.at(0).local == A.at(0).policies.at(0).limited_global);
+    assert(A.at(0).policies.at(0).local== A.at(0).policies.at(0).limited_difference);
+    
+    assert(A.at(0).policies.at(0).true_difference == A.at(0).policies.at(0).limited_global);
+    assert(A.at(0).policies.at(0).true_difference == A.at(0).policies.at(0).limited_difference);
+    
+    assert(A.at(0).policies.at(0).limited_global == A.at(0).policies.at(0).limited_difference);
+    
+    //
+}
+
+void tests::multi_agent_check_waypoints_poi(){
+    
+    //change agents number
+    //change location of POI
+    //change agents x and y
+}
+
+
 /////// END TESTS FUNCTIONS ///////
 
 /////// BGN OTHER FUNCTIONS ///////
@@ -864,54 +1006,39 @@ int main() {
     //T.init();
     //T.single_agent_multi_poi();
     //return 0;
-    
-    
-    parameters P;
-    parameters* pPar = &P;
-    
-    vector<agent> Team;
-    vector<agent>* pA = &Team;
-    for(int a=0; a<pPar->num_agents; a++){
-        agent AA;
-        AA.init(pPar);
-        Team.push_back(AA);
-    }
-    assert(Team.size() == pPar->num_agents);
-    
-    environment E;
-    environment* pE = &E;
-    E.init(pPar);
-    
-    //// Assume team, environment have been initialized 10/19/16
-    
-    for(int i=0; i<pPar->STAT_RUNS; i++){
-        stat_run(pA,pE,pPar,i);
+    if (test_functions) {
+        tests T_obj;
+//        T_obj.init();
+//        T_obj.single_agent_multi_poi();
+        T_obj.single_agent_check_waypoints_poi();
+        T_obj.multi_agent_check_waypoints_poi();
     }
     
-    cout << "End of Program" << endl;
+    if(!test_functions){
+        parameters P;
+        parameters* pPar = &P;
+        
+        vector<agent> Team;
+        vector<agent>* pA = &Team;
+        for(int a=0; a<pPar->num_agents; a++){
+            agent AA;
+            AA.init(pPar);
+            Team.push_back(AA);
+        }
+        assert(Team.size() == pPar->num_agents);
+        
+        environment E;
+        environment* pE = &E;
+        E.init(pPar);
+        
+        //// Assume team, environment have been initialized 10/19/16
+        
+        for(int i=0; i<pPar->STAT_RUNS; i++){
+            stat_run(pA,pE,pPar,i);
+        }
+        
+        cout << "End of Program" << endl;
+    }
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
