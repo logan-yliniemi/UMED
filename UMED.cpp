@@ -21,9 +21,7 @@ double max(double a, double b){
     return b;
 }
 
-<<<<<<< HEAD
 bool test_functions = false;
->>>>>>> origin/master
 bool ak = true;
 
 ///////////////////// %%%%%%%%%%%%%%%%%% BEGIN CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
@@ -196,9 +194,7 @@ public:
     void multi_agent_different_path();
     void multi_agent_same_path_no_joy();
     void multi_agent_same_path_with_joy();
-<<<<<<< HEAD
     void multi_agent_different_path_different_poi();
->>>>>>> origin/master
 };
 
 ///////////////////// %%%%%%%%%%%%%%%%%% END CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
@@ -1017,9 +1013,6 @@ void tests::multi_agent_different_path(){
             cout<<"true_difference::"<<A.at(0).policies.at(0).true_difference<<endl;            //true_difference;
             cout<<"limited_global::"<<A.at(0).policies.at(0).limited_global<<endl;          //limited_global;
             cout<<"limited_difference::"<<A.at(0).policies.at(0).limited_difference<<endl;  //limited_difference;
-<<<<<<< HEAD
-            
->>>>>>> origin/master
         }
     }
     
@@ -1123,11 +1116,9 @@ void tests::multi_agent_same_path_no_joy(){
             if(VERBOSE){
                 cout<<"Location of Agent::"<<rover_number<<endl;
                 cout<<A.at(rover_number).V.x<<"\t"<<A.at(rover_number).V.y<<"\t"<<A.at(rover_number).V.z<<endl;
-<<<<<<< HEAD
                 //                cout<<"Location of POI::"<<endl;
                 //                cout<<E.POIs.at(0).x<<"\t"<<E.POIs.at(0).y<<"\t"<<E.POIs.at(0).z<<endl;
                 //                cout<<E.POIs.at(1).x<<"\t"<<E.POIs.at(1).y<<"\t"<<E.POIs.at(1).z<<endl;
->>>>>>> origin/master
             }
             pA->at(rover_number).observe_poi_distances(pE,pPar);
             pA->at(rover_number).establish_comms_links(pA,pPar);
@@ -1268,11 +1259,9 @@ void tests::multi_agent_same_path_with_joy(){
             if(VERBOSE){
                 cout<<"Location of Agent::"<<rover_number<<endl;
                 cout<<A.at(rover_number).V.x<<"\t"<<A.at(rover_number).V.y<<"\t"<<A.at(rover_number).V.z<<endl;
-<<<<<<< HEAD
                 //                cout<<"Location of POI::"<<endl;
                 //                cout<<E.POIs.at(0).x<<"\t"<<E.POIs.at(0).y<<"\t"<<E.POIs.at(0).z<<endl;
                 //                cout<<E.POIs.at(1).x<<"\t"<<E.POIs.at(1).y<<"\t"<<E.POIs.at(1).z<<endl;
->>>>>>> origin/master
             }
             pA->at(rover_number).observe_poi_distances(pE,pPar);
             pA->at(rover_number).establish_comms_links(pA,pPar);
@@ -1304,12 +1293,9 @@ void tests::multi_agent_same_path_with_joy(){
     
 }
 
-<<<<<<< HEAD
 void tests::multi_agent_different_path_different_poi(){
     
 }
-
->>>>>>> origin/master
 
 /////// END TESTS FUNCTIONS ///////
 
@@ -1386,40 +1372,6 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
         }
         /// should be good to go for next generation at this point.
     }
-<<<<<<< HEAD
-       /// should be good to go for next generation at this point.
-    /// DOWNSELECT
-    int rand1, rand2;
-    double fit1, fit2;
-    for(int a=0; a<pA->size(); a++){
-        /// for each agent...
-        /// policies / 2 times
-        for(int reduce = 0; reduce<pPar->pop_size/2; reduce++){
-            /// kill a policy by binary selection.
-            rand1 = rand()%pA->at(a).policies.size();
-            rand2 = rand()%pA->at(a).policies.size();
-            while(rand2 == rand1){rand2 = rand()%pA->at(a).policies.size();}
-            /// keep selecting rand2 until they are distinct.
-            fit1 = pA->at(a).policies.at(rand1).fitness;
-            fit2 = pA->at(a).policies.at(rand2).fitness;
-            if(fit1 > fit2){
-                /// kill2
-                pA->erase(pA->begin()+rand2);
-            }
-            else{
-                /// kill1
-                pA->erase(pA->begin()+rand1);
-            }
-        }
-    }
-    /// REPOPULATE
-    /// choose random survivors to repopulate.
-    for(int repop = 0; repop<pPar->pop_size/2; repop++){
-        int spot = rand()%pA->size();
-        pA->push_back(pA->at(spot));
-    }
-    /// should be good to go for next generation at this point.
->>>>>>> origin/master
 }
 
 void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar){
@@ -1469,20 +1421,15 @@ int main() {
     //return 0;
     if (test_functions) {
         tests T_obj;
-<<<<<<< HEAD
-
->>>>>>> origin/master
 //        T_obj.init();
 //        T_obj.single_agent_multi_poi();
 //        T_obj.single_agent_check_waypoints_poi();
 //        T_obj.multi_agent_different_path();
 //        T_obj.multi_agent_same_path_no_joy();   //no communication
-<<<<<<< HEAD
 
         T_obj.multi_agent_same_path_with_joy();    //communication
 //        T_obj.multi_agent_same_path_with_joy();    //communication
         T_obj.multi_agent_different_path_different_poi(); //They travel different path and look at different POI's
->>>>>>> origin/master
     }
     
     if(!test_functions){
@@ -1512,6 +1459,4 @@ int main() {
     }
     return 0;
 }
-<<<<<<< HEAD
 
->>>>>>> origin/master
