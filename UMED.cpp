@@ -4,7 +4,6 @@
 //  Copyright © 2016 Logan Yliniemi. All rights reserved.
 //
 
-
 #include <iostream>
 
 using namespace std;
@@ -209,6 +208,11 @@ void agent::init(parameters* pPar){
         policy X;
         X.init(pPar);
         policies.push_back(X);
+        // sets all the polices staring waypoint for an agent the same
+        if (pop>0)
+        {
+            policies.at(pop).WP.at(0) = policies.at(0).WP.at(0);
+        }
     }
     /// create a vector of waypoints for each policy (taken care of in policy.init())
     
@@ -567,7 +571,7 @@ void waypoint::mutate(parameters* pPar,bool surf){
     boundaries(pPar);
 }
 void waypoint::boundaries(parameters* pPar){
-    /// keeps mutated waypoints within boundaries of system.
+    // keeps mutated waypoints within boundaries of system.
     // upper bounds
     if(x > pPar->max_x){
         x = pPar->max_x;
@@ -648,7 +652,7 @@ void tests::init(){
 }
 void tests::single_agent_multi_poi(){
     P.init();
-    A.at(0).init(pPar);
+    //A.at(0).init(pPar);
     E.init(pPar);
     
     double delta = 0.001;
