@@ -166,7 +166,7 @@ public:
     double min_poi_value = 1;
     double max_poi_value = 100;
     
-    int percent_mutate = 50;
+    double percent_mutate = 50;
     
     int STAT_RUNS = 1;
     int GENERATIONS = 2;
@@ -1383,6 +1383,7 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
                 if (r_num<=pPar->percent_mutate/100)
                 {
                  //mutate(pPar, surf);
+                    //cout << "in" << endl;
                 }
             }
         }
