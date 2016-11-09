@@ -166,6 +166,8 @@ public:
     double min_poi_value = 1;
     double max_poi_value = 100;
     
+    int percent_mutate = 50;
+    
     int STAT_RUNS = 1;
     int GENERATIONS = 2;
     bool allow_general_comm_link = true;
@@ -1373,6 +1375,16 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
             int spot = rand()%pA->at(a).policies.size();
             //pA->push_back(pA->at(spot));
             pA->at(a).policies.push_back(pA->at(a).policies.at(spot));
+            //mutation should happen here
+            for (int w=1; w<pPar->num_waypoints; w++)
+            {
+                double r_num = ((double) rand() / (RAND_MAX));
+                //percent chance that the waypoint in question will mutate
+                if (r_num<=pPar->percent_mutate/100)
+                {
+                 //mutate(pPar, surf);
+                }
+            }
         }
         /// should be good to go for next generation at this point.
     }
