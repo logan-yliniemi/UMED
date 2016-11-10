@@ -662,9 +662,10 @@ void tests::init(){
     agent AA;
     A.push_back(AA);
 }
+
 void tests::single_agent_multi_poi(){
     P.init();
-    //A.at(0).init(pPar);
+    A.at(0).init(pPar);
     E.init(pPar);
     
     double delta = 0.001;
@@ -1029,6 +1030,7 @@ void tests::multi_agent_different_path(){
             cout<<"true_difference::"<<A.at(0).policies.at(0).true_difference<<endl;            //true_difference;
             cout<<"limited_global::"<<A.at(0).policies.at(0).limited_global<<endl;          //limited_global;
             cout<<"limited_difference::"<<A.at(0).policies.at(0).limited_difference<<endl;  //limited_difference;
+            
         }
     }
     
@@ -1175,9 +1177,8 @@ void tests::multi_agent_same_path_no_joy(){
     
 }
 
-
 void tests::multi_agent_same_path_with_joy(){
-    bool VERBOSE = true;
+    bool VERBOSE = false;
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1310,10 +1311,131 @@ void tests::multi_agent_same_path_with_joy(){
 }
 
 void tests::multi_agent_different_path_different_poi(){
+    bool VERBOSE = true;
+    //Set all the values
+    pPar->num_agents = 2;
+    pPar->num_vehicles = 2;
+    pPar->pop_size = 1;
+    pPar->num_POI = 6;
+    pPar->num_waypoints = 14;
+    pPar->maximum_observation_distance = 1;
+    pPar->P2P_commlink_dist = 1;
+    
+    //Create a agent and initalize its values
+    agent a_1;
+    agent a_2;
+    A.clear();
+    A.push_back(a_1);
+    A.push_back(a_2);
+    for (int temp_num_agents = 0; temp_num_agents<pPar->num_agents; temp_num_agents++) {
+        A.at(temp_num_agents).init(pPar);
+    }
+    
+    
+    //Create environment
+    E.init(pPar);
+    
+    double delta = 0.001; // This value is used in calculation of local values
+    
+    /// Create location for POI
+    //Food for agent_1
+    for (int temp=0, temp_1=10; temp<3; temp++) {
+        E.POIs.at(temp).x =temp_1;
+        E.POIs.at(temp).y = temp_1;
+        E.POIs.at(temp).z = temp_1;
+        E.POIs.at(temp).val = 100;
+        temp_1 += 5;
+    }
+    //Food for agent_2
+    for (int temp=3, temp_1=100; temp<6; temp++) {
+        E.POIs.at(temp).x =temp_1;
+        E.POIs.at(temp).y = temp_1;
+        E.POIs.at(temp).z = temp_1;
+        E.POIs.at(temp).val = 100;
+        temp_1 -= 25;
+    }
+    
+    //Agent location
+    for (int temp = 0, temp_1=0; temp<6; temp++) {
+        A.at(0).policies.at(0).WP.at(temp).x = temp_1;
+        A.at(0).policies.at(0).WP.at(temp).y = temp_1;
+        A.at(0).policies.at(0).WP.at(temp).z = temp_1;
+        temp_1 += 5;
+    }
+    
+    for (int temp = 0, temp_1=200; temp<8; temp++) {
+        A.at(1).policies.at(0).WP.at(temp).x = temp_1;
+        A.at(1).policies.at(0).WP.at(temp).y = temp_1;
+        A.at(1).policies.at(0).WP.at(temp).z = temp_1;
+        temp_1 -= 25;
+    }
+    
+    //Set in agents along vehicles in water
+    for (int rover_number = 0; rover_number<pPar->num_agents; rover_number++) {
+        A.at(rover_number).start_generation(); // all policies have everything to zero
+        A.at(rover_number).start_simulation(pPar);
+        A.at(rover_number).select_fresh_policy();
+        A.at(rover_number).V.start_based_on_policy(A.at(rover_number).policies.at(0), pPar->num_agents); //placed at first waypoint
+    }
+    
+    //each iteration move in different path
+    //for each time step
+    for (int time_step = 0; time_step<A.at(0).policies.at(0).WP.size(); time_step++) {
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            if (rover_number == 0 && time_step > 5) {
+                continue;
+            }
+            if (rover_number == 1 && time_step> 6) {
+                continue;
+            }
+            int dex = pA->at(rover_number).active_policy_index;
+            policy P = pA->at(rover_number).policies.at(dex);
+            pA->at(rover_number).V.move_to_wp(P,time_step);
+            
+            assert(A.at(rover_number).policies.at(0).WP.at(time_step).x == A.at(rover_number).V.x);
+            assert(A.at(rover_number).policies.at(0).WP.at(time_step).y == A.at(rover_number).V.y);
+            assert(A.at(rover_number).policies.at(0).WP.at(time_step).z == A.at(rover_number).V.z);
+            
+            if(VERBOSE){
+                cout<<"Location of Agent::"<<rover_number<<endl;
+                cout<<A.at(rover_number).V.x<<"\t"<<A.at(rover_number).V.y<<"\t"<<A.at(rover_number).V.z<<endl;
+            }
+            pA->at(rover_number).observe_poi_distances(pE,pPar);
+            pA->at(rover_number).establish_comms_links(pA,pPar);
+            pA->at(rover_number).exchange_information_P2P(pA,pPar);
+        }
+    }
+    
+    //calculate the values
+    for(int a=0; a<pPar->num_agents; a++){
+        pA->at(a).calc_local(pA,pE,pPar);
+        pA->at(a).calc_true_global(pA,pE,pPar);
+        pA->at(a).calc_true_difference(pA,pE,pPar);
+        pA->at(a).calc_limited_global(pA,pE,pPar);
+        pA->at(a).calc_limited_difference(pA,pE,pPar);
+        pA->at(a).LGD_to_fitness(pA,pE,pPar);
+    }
+    
+    if(VERBOSE){
+        for (int rover_number = 0 ; rover_number<pPar->num_agents; rover_number++) {
+            cout<<"For rover::"<<rover_number<<endl;
+            cout<<"fitness:"<<A.at(rover_number).policies.at(0).fitness<<endl;            //fitness;
+            cout<<"local::"<<A.at(rover_number).policies.at(0).local<<endl;               //local;
+            cout<<"true_global::"<<A.at(rover_number).policies.at(0).true_global<<endl; //true_global;
+            cout<<"true_difference::"<<A.at(rover_number).policies.at(0).true_difference<<endl;  //true_difference;
+            cout<<"limited_global::"<<A.at(rover_number).policies.at(0).limited_global<<endl;          //limited_global;
+            cout<<"limited_difference::"<<A.at(rover_number).policies.at(0).limited_difference<<endl;  //limited_difference;
+            cout<<endl;
+            
+        }
+    }
+    cout<<"Check Location"<<endl;
     
 }
 
+
 /////// END TESTS FUNCTIONS ///////
+
 
 
 
@@ -1444,14 +1566,12 @@ int main() {
     //return 0;
     if (test_functions) {
         tests T_obj;
-//        T_obj.init();
-//        T_obj.single_agent_multi_poi();
-//        T_obj.single_agent_check_waypoints_poi();
-//        T_obj.multi_agent_different_path();
-//        T_obj.multi_agent_same_path_no_joy();   //no communication
-
-        T_obj.multi_agent_same_path_with_joy();    //communication
-//        T_obj.multi_agent_same_path_with_joy();    //communication
+        //        T_obj.init();
+        //        T_obj.single_agent_multi_poi();
+        //        T_obj.single_agent_check_waypoints_poi();
+        //        T_obj.multi_agent_different_path();
+        //        T_obj.multi_agent_same_path_no_joy();   //no communication
+        //        T_obj.multi_agent_same_path_with_joy();    //communication
         T_obj.multi_agent_different_path_different_poi(); //They travel different path and look at different POI's
     }
     
