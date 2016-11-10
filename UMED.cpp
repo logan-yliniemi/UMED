@@ -152,7 +152,7 @@ public:
     int num_vehicles = num_agents; // 1 vehicle per agent
     int num_POI = 5*num_agents;
     int pop_size = 2;
-    int num_waypoints = 10;
+    int num_waypoints = 3;
     
     double mutation_size = 5.0;
     
@@ -515,6 +515,7 @@ void policy::mutate(parameters* pPar){
         //percent chance that the waypoint in question will mutate
         if (r_num<=pPar->percent_mutate/100)
         {
+            //cout << "waypoint" << "\t" << w << endl;
             WP.at(w).mutate(pPar);
         }
     }
@@ -539,7 +540,7 @@ void vehicle::start_based_on_policy(policy& rPol, int num_agents){
     x = rPol.WP.at(0).x;
     y = rPol.WP.at(0).y;
     z = rPol.WP.at(0).z;
-    cout << "starting telem" << "\t" << x << "\t" << y << "\t" << z << endl;
+    //cout << "starting telem" << "\t" << x << "\t" << y << "\t" << z << endl;
     
     general_comm_link = false;
     
@@ -553,7 +554,7 @@ void vehicle::move_to_wp(policy& rPol, int wp){
     x = rPol.WP.at(wp).x;
     y = rPol.WP.at(wp).y;
     z = rPol.WP.at(wp).z;
-    cout << "new telem" << "\t" << x << "\t" << y << "\t" << z << endl;
+    //cout << "new telem" << "\t" << x << "\t" << y << "\t" << z << endl;
     
     if(z > 0){
         general_comm_link = true;
@@ -1340,12 +1341,11 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
     cout << "GENERATION\t" << SR << " :: " << gen << endl;
     for(int a=0; a<pPar->num_agents; a++){
         pA->at(a).start_generation();           //acts as a reset for entire population
-        //next gen dosent work
     }
     //controls the amount of simulatiosn ran in a generation by the amount of policies
     for(int sim=0; sim<pPar->pop_size; sim++){
-        cout << "-------------------------------------------------------------------" << endl;
-        cout << "simulation" << "\t" << sim << endl;
+        //cout << "-------------------------------------------------------------------" << endl;
+        //cout << "simulation" << "\t" << sim << endl;
         /// select a policy for each agent.
         for(int a=0; a<pPar->num_agents; a++){
             pA->at(a).select_fresh_policy();
@@ -1379,12 +1379,17 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
         }
         /// REPOPULATE
         /// choose random survivors to repopulate.
+        //cout << endl;
+        //cout << "agent" << "\t" << a << endl;
         for(int repop = 0; repop<pPar->pop_size/2; repop++){
             //int spot = rand()%pA->size();     //we are looking at policies not agents
             int spot = rand()%pA->at(a).policies.size();
+            //cout << "vec size" << "\t" << pA->at(a).policies.size() << endl;
             //pA->push_back(pA->at(spot));
             pA->at(a).policies.push_back(pA->at(a).policies.at(spot));
             //mutation should happen here
+            //cout << spot << endl;
+            //cout << endl;
             pA->at(a).policies.back().mutate(pPar);
                     //cout << "in" << endl;
         }
@@ -1396,7 +1401,7 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar){
     for(int a=0; a<pPar->num_agents; a++){
         int dex = pA->at(a).active_policy_index;
         policy P = pA->at(a).policies.at(dex);
-        cout << "agent" << "\t" << a << endl;
+        //cout << "agent" << "\t" << a << endl;
         pA->at(a).V.start_based_on_policy(P,pPar->num_agents);
         pA->at(a).start_simulation(pPar);   //resets policy observation data
     }
@@ -1419,7 +1424,7 @@ void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum){
     for(int a=0; a<pPar->num_agents; a++){
         int dex = pA->at(a).active_policy_index;
         policy P = pA->at(a).policies.at(dex);
-        cout << "agent" << "\t" << a << endl;
+        //cout << "agent" << "\t" << a << endl;
         pA->at(a).V.move_to_wp(P,wpnum);
     }
     for(int a=0; a<pPar->num_agents; a++){
