@@ -63,7 +63,7 @@ public:
     double z;
     void create_surface(parameters* pPar);
     void create_random(parameters* pPar);
-    void mutate(parameters* pPar,bool surf);
+    void mutate(parameters* pPar);
     void boundaries(parameters* pPar);
 };
 
@@ -105,6 +105,7 @@ public:
     void init(parameters* pPar);
     
     void start_generation();
+    void mutate(parameters* pPar);
     double fitness; /// whichever signal we are using to learn
     double local;
     double true_global;
@@ -508,6 +509,16 @@ void policy::start_generation(){
     fitness = 0;
     active = false;
 }
+void policy::mutate(parameters* pPar){
+    for(int w=1; w<WP.size(); w++){
+        double r_num = ((double) rand() / (RAND_MAX));
+        //percent chance that the waypoint in question will mutate
+        if (r_num<=pPar->percent_mutate/100)
+        {
+            WP.at(w).mutate(pPar);
+        }
+    }
+}
 /////// END Policy FUNCTIONS ///////
 
 /////// BGN Observation FUNCTIONS ///////
@@ -564,12 +575,10 @@ void waypoint::create_random(parameters* pPar){
     y = uniform_random(pPar->min_y,pPar->max_y);
     z = uniform_random(pPar->min_z,pPar->max_z);
 }
-void waypoint::mutate(parameters* pPar,bool surf){
+void waypoint::mutate(parameters* pPar){
     x += uniform_random(-pPar->mutation_size,pPar->mutation_size);
     y += uniform_random(-pPar->mutation_size,pPar->mutation_size);
-    if(surf==false){
-        z += uniform_random(-pPar->mutation_size,pPar->mutation_size);
-    }
+    z += uniform_random(-pPar->mutation_size,pPar->mutation_size);
     boundaries(pPar);
 }
 void waypoint::boundaries(parameters* pPar){
@@ -1376,16 +1385,8 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
             //pA->push_back(pA->at(spot));
             pA->at(a).policies.push_back(pA->at(a).policies.at(spot));
             //mutation should happen here
-            for (int w=1; w<pPar->num_waypoints; w++)
-            {
-                double r_num = ((double) rand() / (RAND_MAX));
-                //percent chance that the waypoint in question will mutate
-                if (r_num<=pPar->percent_mutate/100)
-                {
-                 //mutate(pPar, surf);
+            pA->at(a).policies.back().mutate(pPar);
                     //cout << "in" << endl;
-                }
-            }
         }
         /// should be good to go for next generation at this point.
     }
