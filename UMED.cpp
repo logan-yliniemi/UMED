@@ -21,7 +21,7 @@ double max(double a, double b){
     return b;
 }
 
-bool test_functions = false;
+bool test_functions = true;
 
 ///////////////////// %%%%%%%%%%%%%%%%%% BEGIN CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
 
@@ -198,6 +198,7 @@ public:
     void multi_agent_same_path_with_joy();
     void multi_agent_different_path_different_poi();
     void communication_test();
+    void three_agents_limited_joy();
 };
 
 ///////////////////// %%%%%%%%%%%%%%%%%% END CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
@@ -227,7 +228,7 @@ void agent::init(parameters* pPar){
     
 }
 void agent::init_obs_distance(parameters* pPar){
-    bool VERBOSE = false;
+    bool VERBOSE = true;
     double DBL_MAX = std::numeric_limits<double>::max();
     my_observations.clear();
     others_observations.clear();
@@ -418,17 +419,28 @@ void agent::calc_limited_global(vector<agent>* pA, environment* pE, parameters* 
     return;
 }
 void agent::calc_true_difference(vector<agent>* pA, environment* pE, parameters* pPar){
+    bool VERBOSE = false;
     policies.at(active_policy_index).true_difference = 0;
     double true_cf = 0;
     /// TODO use all agent's "my observations"
-    
+    if(VERBOSE){
+        for (int rover_number = 0; rover_number<pA->size(); rover_number++) {
+            cout<<"This is for rover::"<<rover_number<<endl;
+            for (int temp = 0; temp < pA->at(rover_number).my_observations.size(); temp++) {
+                cout<<pA->at(rover_number).my_observations.at(temp).observation_distance<<"\t";
+                cout<<pA->at(rover_number).my_observations.at(temp).observer_id<<"\t";
+                cout<<endl;
+            }
+            cout<<endl;
+        }
+    }
     vector<double> closest(pPar->num_POI,std::numeric_limits<double>::max());
     double dis;
     for(int a=0; a<pPar->num_agents; a++){
         if(a==id){
             continue;
         }
-        for(int p=0; p<pPar->num_agents; p++){
+        for(int p=0; p<pPar->num_POI; p++){
             dis = pA->at(a).my_observations.at(p).observation_distance;
             if(dis<closest.at(p)){
                 closest.at(p) = dis;
@@ -1611,6 +1623,53 @@ void tests::communication_test(){
     
 }
 
+void tests::three_agents_limited_joy(){
+    bool VERBOSE = true;
+    //Set all the values
+    pPar->num_agents = 2;
+    pPar->num_vehicles = 2;
+    pPar->pop_size = 1;
+    pPar->num_POI = 6;
+    pPar->num_waypoints = 14;
+    pPar->maximum_observation_distance = 1;
+    pPar->P2P_commlink_dist = 1;
+    
+    //Create a agent and initalize its values
+    agent a_1;
+    agent a_2;
+    A.clear();
+    A.push_back(a_1);
+    A.push_back(a_2);
+    for (int temp_num_agents = 0; temp_num_agents<pPar->num_agents; temp_num_agents++) {
+        A.at(temp_num_agents).init(pPar);
+    }
+    
+    
+    //Create environment
+    E.init(pPar);
+    
+    double delta = 0.001; // This value is used in calculation of local values
+    
+    /// Create location for POI
+    //Food for agent_1
+    for (int temp=0, temp_1=10; temp<3; temp++) {
+        E.POIs.at(temp).x =temp_1;
+        E.POIs.at(temp).y = temp_1;
+        E.POIs.at(temp).z = -temp_1;
+        E.POIs.at(temp).val = 100;
+        temp_1 += 5;
+    }
+    //Food for agent_2
+    for (int temp=3, temp_1=100; temp<6; temp++) {
+        E.POIs.at(temp).x =temp_1;
+        E.POIs.at(temp).y = temp_1;
+        E.POIs.at(temp).z = -temp_1;
+        E.POIs.at(temp).val = 100;
+        temp_1 -= 25;
+    }
+
+}
+
 /////// END TESTS FUNCTIONS ///////
 
 /////// BGN OTHER FUNCTIONS ///////
@@ -1720,6 +1779,7 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar){
     p_file = fopen("stat", "a");
     
     for (int rover_number = 0 ; rover_number<pPar->num_agents; rover_number++) {
+        
         cout<<"For rover::"<<rover_number<<endl;
         
         cout<<"fitness:"<<pA->at(rover_number).policies.at(0).fitness<<endl;            //fitness;
@@ -1741,9 +1801,10 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar){
         fprintf(p_file, "%f \t",pA->at(rover_number).policies.at(0).limited_difference);
         fprintf(p_file, "\n");
         cout<<endl;
+        
     }
-    fclose(p_file);
     
+    fclose(p_file);
 }
 
 void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum){
@@ -1778,6 +1839,7 @@ int main() {
 //        T_obj.multi_agent_same_path_with_joy();    //communication
 //        T_obj.multi_agent_different_path_different_poi(); //They travel different path and look at different POI's
 //        T_obj.communication_test(); //They travel different path and look at different POI's
+       T_obj.three_agents_limited_joy();
     }
     
     if(!test_functions){
