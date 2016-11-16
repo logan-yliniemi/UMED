@@ -21,7 +21,7 @@ double max(double a, double b){
     return b;
 }
 
-bool test_functions = true;
+bool test_functions = false;
 
 ///////////////////// %%%%%%%%%%%%%%%%%% BEGIN CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
 
@@ -38,7 +38,7 @@ class testparameters;
 class tests;
 
 void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen);
-void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar);
+void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen);
 void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR);
 void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum);
 
@@ -148,11 +148,11 @@ public:
 
 class parameters{
 public:
-    int num_agents = 2;
+    int num_agents = 10;
     int num_vehicles = num_agents; // 1 vehicle per agent
     int num_POI = 5*num_agents;
-    int pop_size = 2;
-    int num_waypoints = 3;
+    int pop_size = 10;
+    int num_waypoints = 7;
     
     double mutation_size = 5.0;
     
@@ -228,7 +228,7 @@ void agent::init(parameters* pPar){
     
 }
 void agent::init_obs_distance(parameters* pPar){
-    bool VERBOSE = true;
+    bool VERBOSE = false;
     double DBL_MAX = std::numeric_limits<double>::max();
     my_observations.clear();
     others_observations.clear();
@@ -715,7 +715,7 @@ void tests::single_agent_multi_poi(){
     A.at(0).start_simulation(pPar);
     A.at(0).select_fresh_policy();
     
-    single_simulation(pA,pE,pPar);
+    single_simulation(pA,pE,pPar,0);
     
     policy* pPol = &A.at(0).policies.at(0);
     if(P.maximum_observation_distance > 18){
@@ -761,7 +761,7 @@ void tests::single_agent_multi_poi(){
     A.at(0).start_simulation(pPar);
     A.at(0).select_fresh_policy();
     
-    single_simulation(pA,pE,pPar);
+    single_simulation(pA,pE,pPar,0);
     
     double L2 = pPol->local;
     
@@ -787,7 +787,7 @@ void tests::single_agent_multi_poi(){
     A.at(0).start_simulation(pPar);
     A.at(0).select_fresh_policy();
     
-    single_simulation(pA,pE,pPar);
+    single_simulation(pA,pE,pPar,0);
     
     double L3 = pPol->local;
     assert(L3 > L2);
@@ -925,7 +925,7 @@ void tests::single_agent_check_waypoints_poi(){
 }
 
 void tests::multi_agent_different_path(){
-    bool VERBOSE = true;
+    bool VERBOSE = false;
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1078,7 +1078,7 @@ void tests::multi_agent_different_path(){
 }
 
 void tests::multi_agent_same_path_no_joy(){
-    bool VERBOSE = true;
+    bool VERBOSE = false;
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1216,7 +1216,7 @@ void tests::multi_agent_same_path_no_joy(){
 }
 
 void tests::multi_agent_same_path_with_joy(){
-    bool VERBOSE = true;
+    bool VERBOSE = false;
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1349,7 +1349,7 @@ void tests::multi_agent_same_path_with_joy(){
 }
 
 void tests::multi_agent_different_path_different_poi(){
-    bool VERBOSE = true;
+    bool VERBOSE = false;
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1486,7 +1486,7 @@ void tests::multi_agent_different_path_different_poi(){
 }
 
 void tests::communication_test(){
-    bool VERBOSE = true;
+    bool VERBOSE = false;
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1624,7 +1624,7 @@ void tests::communication_test(){
 }
 
 void tests::three_agents_limited_joy(){
-    bool VERBOSE = true;
+    bool VERBOSE = false;
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1682,7 +1682,7 @@ void tests::three_agents_limited_joy(){
 
 void stat_run(vector<agent>*pA,environment* pE,parameters* pPar);
 void single_generation(vector<agent>*pA,environment* pE,parameters* pPar,int SR,int gen);
-void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar);
+void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen);
 void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum);
 
 void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR){
@@ -1706,7 +1706,7 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
             pA->at(a).select_fresh_policy();
         }
         /// simulate based on selected policy.
-        single_simulation(pA, pE, pPar);
+        single_simulation(pA, pE, pPar,gen);
         
     }
     /// DOWNSELECT
@@ -1752,7 +1752,7 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
     }
 }
 
-void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar){
+void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen){
     for(int a=0; a<pPar->num_agents; a++){
         int dex = pA->at(a).active_policy_index;
         policy P = pA->at(a).policies.at(dex);
@@ -1780,25 +1780,30 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar){
     
     for (int rover_number = 0 ; rover_number<pPar->num_agents; rover_number++) {
         
-        cout<<"For rover::"<<rover_number<<endl;
+        int active = pA->at(rover_number).active_policy_index;
         
-        cout<<"fitness:"<<pA->at(rover_number).policies.at(0).fitness<<endl;            //fitness;
-        fprintf(p_file, "%f \t",pA->at(rover_number).policies.at(0).fitness);
+        //cout<<"For rover::"<<rover_number<<endl;
+        fprintf(p_file, "%d \t", gen);
+        fprintf(p_file, "%d \t", rover_number);
+        fprintf(p_file, "%d \t", active);
         
-        cout<<"local::"<<pA->at(rover_number).policies.at(0).local<<endl;               //local;
-        fprintf(p_file, "%f \t",pA->at(rover_number).policies.at(0).local);
+        //cout<<"fitness:"<<pA->at(rover_number).policies.at(active).fitness<<endl;            //fitness;
+        fprintf(p_file, "%f \t",pA->at(rover_number).policies.at(active).fitness);
         
-        cout<<"true_global::"<<pA->at(rover_number).policies.at(0).true_global<<endl; //true_global;
-        fprintf(p_file, "%f \t ",pA->at(rover_number).policies.at(0).true_global);
+        //cout<<"local::"<<pA->at(rover_number).policies.at(active).local<<endl;               //local;
+        fprintf(p_file, "%f \t",pA->at(rover_number).policies.at(active).local);
         
-        cout<<"true_difference::"<<pA->at(rover_number).policies.at(0).true_difference<<endl;  //true_difference;
-        fprintf(p_file, "%f \t ",pA->at(rover_number).policies.at(0).true_difference);
+        //cout<<"true_global::"<<pA->at(rover_number).policies.at(active).true_global<<endl; //true_global;
+        fprintf(p_file, "%f \t ",pA->at(rover_number).policies.at(active).true_global);
         
-        cout<<"limited_global::"<<pA->at(rover_number).policies.at(0).limited_global<<endl;          //limited_global;
-        fprintf(p_file, "%f \t",pA->at(rover_number).policies.at(0).limited_global);
+        //cout<<"true_difference::"<<pA->at(rover_number).policies.at(active).true_difference<<endl;  //true_difference;
+        fprintf(p_file, "%f \t ",pA->at(rover_number).policies.at(active).true_difference);
         
-        cout<<"limited_difference::"<<pA->at(rover_number).policies.at(0).limited_difference<<endl;  //limited_difference;
-        fprintf(p_file, "%f \t",pA->at(rover_number).policies.at(0).limited_difference);
+        //cout<<"limited_global::"<<pA->at(rover_number).policies.at(active).limited_global<<endl;          //limited_global;
+        fprintf(p_file, "%f \t",pA->at(rover_number).policies.at(active).limited_global);
+        
+        //cout<<"limited_difference::"<<pA->at(rover_number).policies.at(active).limited_difference<<endl;  //limited_difference;
+        fprintf(p_file, "%f \t",pA->at(rover_number).policies.at(active).limited_difference);
         fprintf(p_file, "\n");
         cout<<endl;
         
