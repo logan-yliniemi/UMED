@@ -148,10 +148,10 @@ public:
 
 class parameters{
 public:
-    int num_agents = 10;
+    int num_agents = 4;
     int num_vehicles = num_agents; // 1 vehicle per agent
     int num_POI = 5*num_agents;
-    int pop_size = 10;
+    int pop_size = 4;
     int num_waypoints = 7;
     
     double mutation_size = 5.0;
@@ -174,7 +174,7 @@ public:
     bool allow_general_comm_link = true;
     
     double P2P_commlink_dist = 300;
-    double maximum_observation_distance = 100;
+    double maximum_observation_distance = 300;
     
     void init();
     void single_agent_test_overwrite();
@@ -322,6 +322,7 @@ void agent::exchange_information_P2P(vector<agent>* pA, parameters* pPar){
         if(comms_P2P_available.at(a) == false){
             continue;
         }
+        
         /// if the comms link is available...
         for(int p = 0; p<pPar->num_POI; p++){
             /// update my observations for every POI into the agent a's database.
@@ -343,6 +344,7 @@ void agent::exchange_information_P2P(vector<agent>* pA, parameters* pPar){
                 }
             }
         }
+        
         /// the following two happen during the other running this function:
         /// update the other's observations into my database.
         /// update the other's knowledge of other's into my database.
@@ -350,19 +352,21 @@ void agent::exchange_information_P2P(vector<agent>* pA, parameters* pPar){
 }
 void agent::calc_local(vector<agent>* pA, environment* pE, parameters* pPar){
     policies.at(active_policy_index).local = 0;
+    double L = 0;
     for(int p=0; p<pPar->num_POI; p++){
         double value = pE->POIs.at(p).val;
         double delta = max(1.0,my_observations.at(p).observation_distance);
         double contribution = value/delta;
-        policies.at(active_policy_index).local+=contribution;
+        L+=contribution;
     }
+    policies.at(active_policy_index).local = L;
     return;
 }
 void agent::calc_true_global(vector<agent>* pA, environment* pE, parameters* pPar){
     policies.at(active_policy_index).true_global = 0;
     /// LYLY Note that this is current calculated "agents" times, and does not strictly need to be; the true_global could be calculated once and broadcast.
     double dis;
-    double g=0;
+    double g = 0;
     vector<double> closest(pPar->num_POI,std::numeric_limits<double>::max());
     for(int p=0; p<pPar->num_POI; p++){
         for(int a=0; a<pPar->num_agents; a++){
@@ -387,7 +391,7 @@ void agent::calc_true_global(vector<agent>* pA, environment* pE, parameters* pPa
 void agent::calc_limited_global(vector<agent>* pA, environment* pE, parameters* pPar){
     policies.at(active_policy_index).limited_global = 0;
     /// TODO use "others observations".
-    double limg;
+    double limg = 0;
     
     double dis;
     vector<double> closest(pPar->num_POI,std::numeric_limits<double>::max());
@@ -1349,7 +1353,7 @@ void tests::multi_agent_same_path_with_joy(){
 }
 
 void tests::multi_agent_different_path_different_poi(){
-    bool VERBOSE = false;
+    bool VERBOSE = true;
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1482,6 +1486,31 @@ void tests::multi_agent_different_path_different_poi(){
         }
     }
     cout<<"Check Location"<<endl;
+    
+    if(VERBOSE){
+        
+        for(int a=0; a<pPar->num_agents; a++){
+            cout << "AGENT " << a << ":\t";
+            for(int p=0; p<pPar->num_POI; p++){
+                cout << pA->at(a).my_observations.at(p).observation_distance << "\t";
+            }
+            cout << endl;
+        }
+        cout << endl;
+        
+        for(int a=0; a<pPar->num_agents; a++){
+            for(int b = 0; b<pPar->num_agents; b++){
+                
+                cout << "AGENT " << a << "'s BELIEFS ABOUT AGENT " << b << ":\t";
+                for(int p=0; p<pPar->num_POI; p++){
+                    cout << pA->at(a).others_observations.at(b).at(p).observation_distance << "\t";
+                }
+                cout << endl;
+            }
+            cout << endl;
+        }
+        
+    }
     
 }
 
@@ -1805,7 +1834,7 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int ge
         //cout<<"limited_difference::"<<pA->at(rover_number).policies.at(active).limited_difference<<endl;  //limited_difference;
         fprintf(p_file, "%f \t",pA->at(rover_number).policies.at(active).limited_difference);
         fprintf(p_file, "\n");
-        cout<<endl;
+        //cout<<endl;
         
     }
     
@@ -1842,9 +1871,9 @@ int main() {
 //        T_obj.multi_agent_different_path();
 //        T_obj.multi_agent_same_path_no_joy();   //no communication
 //        T_obj.multi_agent_same_path_with_joy();    //communication
-//        T_obj.multi_agent_different_path_different_poi(); //They travel different path and look at different POI's
+        T_obj.multi_agent_different_path_different_poi(); //They travel different path and look at different POI's
 //        T_obj.communication_test(); //They travel different path and look at different POI's
-       T_obj.three_agents_limited_joy();
+ //      T_obj.three_agents_limited_joy();
     }
     
     if(!test_functions){
