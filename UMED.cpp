@@ -309,6 +309,9 @@ void agent::establish_comms_links(vector<agent>* pA, parameters* pPar){
         if(dist < pPar->P2P_commlink_dist){
             comms_P2P_available.push_back(true);
         }
+        else if(V.z >= 0 && pA->at(a).V.z >= 0 && pPar->allow_general_comm_link){
+            comms_P2P_available.push_back(true);
+        }
         else{
             comms_P2P_available.push_back(false);
         }
