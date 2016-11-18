@@ -21,7 +21,7 @@ double max(double a, double b){
     return b;
 }
 
-bool test_functions = true;
+bool test_functions = false;
 bool reset_id = false;
 
 ///////////////////// %%%%%%%%%%%%%%%%%% BEGIN CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
@@ -38,9 +38,9 @@ class parameters;
 class testparameters;
 class tests;
 
-void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen);
-void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen);
-void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR);
+void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen,FILE* p_file);
+void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen,FILE* p_file);
+void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR,FILE* p_file);
 void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum);
 
 class vehicle{
@@ -730,7 +730,9 @@ void tests::single_agent_multi_poi(){
     A.at(0).start_simulation(pPar);
     A.at(0).select_fresh_policy();
     
-    single_simulation(pA,pE,pPar,0);
+    FILE* p_obj;
+    p_obj=fopen("temp","a");
+    single_simulation(pA,pE,pPar,0,p_obj);
     
     policy* pPol = &A.at(0).policies.at(0);
     if(P.maximum_observation_distance > 18){
@@ -776,7 +778,7 @@ void tests::single_agent_multi_poi(){
     A.at(0).start_simulation(pPar);
     A.at(0).select_fresh_policy();
     
-    single_simulation(pA,pE,pPar,0);
+    single_simulation(pA,pE,pPar,0,p_obj);
     
     double L2 = pPol->local;
     
@@ -802,7 +804,8 @@ void tests::single_agent_multi_poi(){
     A.at(0).start_simulation(pPar);
     A.at(0).select_fresh_policy();
     
-    single_simulation(pA,pE,pPar,0);
+    single_simulation(pA,pE,pPar,0,p_obj);
+    fclose(p_obj);
     
     double L3 = pPol->local;
     assert(L3 > L2);
@@ -2092,19 +2095,19 @@ void tests::three_rover_not_surfacing(){
 
 ///////////////////// %%%%%%%%%%%%%%%%%% END CLASS FUNCTIONS %%%%%%%%%%%%%%%%%% /////////////////////
 
-void stat_run(vector<agent>*pA,environment* pE,parameters* pPar);
-void single_generation(vector<agent>*pA,environment* pE,parameters* pPar,int SR,int gen);
-void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen);
+void stat_run(vector<agent>*pA,environment* pE,parameters* pPar,int SR, FILE* p_file);
+void single_generation(vector<agent>*pA,environment* pE,parameters* pPar,int SR,int gen,FILE* p_file);
+void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen,FILE* p_file);
 void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum);
 
-void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR){
+void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR, FILE* p_file){
     cout << "STAT RUN\t\t" << SR << endl;
     for(int gen = 0; gen<pPar->GENERATIONS; gen++){
-        single_generation(pA,pE,pPar,SR,gen);
+        single_generation(pA,pE,pPar,SR,gen,p_file);
     }
 }
 
-void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen){
+void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen,FILE* p_file){
     cout << "GENERATION\t" << SR << " :: " << gen << endl;
     for(int a=0; a<pPar->num_agents; a++){
         pA->at(a).start_generation();           //acts as a reset for entire population
@@ -2118,7 +2121,7 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
             pA->at(a).select_fresh_policy();
         }
         /// simulate based on selected policy.
-        single_simulation(pA, pE, pPar,gen);
+        single_simulation(pA, pE, pPar,gen,p_file);
         
     }
     /// DOWNSELECT
@@ -2133,9 +2136,28 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
             rand2 = rand()%pA->at(a).policies.size();
             while(rand2 == rand1){rand2 = rand()%pA->at(a).policies.size();}
             /// keep selecting rand2 until they are distinct.
-            fit1 = pA->at(a).policies.at(rand1).fitness;
-            fit2 = pA->at(a).policies.at(rand2).fitness;
-            if(fit1 > fit2){
+            int stat_run_case = 3;
+            switch (stat_run_case) {
+                case 1:
+                    fit1 = pA->at(a).policies.at(rand1).fitness;
+                    fit2 = pA->at(a).policies.at(rand2).fitness;
+                    break;
+                case 2:
+                    fit1 = pA->at(a).policies.at(rand1).limited_difference;
+                    fit2 = pA->at(a).policies.at(rand2).limited_difference;
+                    break;
+                case 3:
+                    fit1 = pA->at(a).policies.at(rand1).true_difference;
+                    fit2 = pA->at(a).policies.at(rand2).true_difference;
+                    break;
+                default:
+                    fit1 = pA->at(a).policies.at(rand1).fitness;
+                    fit2 = pA->at(a).policies.at(rand2).fitness;
+                    break;
+            }
+            //fit1 = pA->at(a).policies.at(rand1).fitness;
+            //fit2 = pA->at(a).policies.at(rand2).fitness;
+                        if(fit1 > fit2){
                 /// kill2
                 pA->at(a).policies.erase(pA->at(a).policies.begin() + rand2);
             }
@@ -2164,7 +2186,7 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
     }
 }
 
-void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen){
+void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen, FILE* p_file){
     for(int a=0; a<pPar->num_agents; a++){
         int dex = pA->at(a).active_policy_index;
         policy P = pA->at(a).policies.at(dex);
@@ -2186,9 +2208,7 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int ge
         pA->at(a).LGD_to_fitness(pA,pE,pPar);
     }
     
-    FILE * p_file;
-    
-    p_file = fopen("stat", "a");
+
     
     for (int rover_number = 0 ; rover_number<pPar->num_agents; rover_number++) {
         
@@ -2221,7 +2241,7 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int ge
         
     }
     
-    fclose(p_file);
+    //fclose(p_file);
 }
 
 void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum){
@@ -2267,6 +2287,10 @@ int main() {
     if(!test_functions){
         parameters P;
         parameters* pPar = &P;
+        string date_time_stamp = "datetime";
+        
+        FILE* p_file;
+        p_file = fopen("stat", "a");
         
         vector<agent> Team;
         vector<agent>* pA = &Team;
@@ -2284,8 +2308,9 @@ int main() {
         //// Assume team, environment have been initialized 10/19/16
         
         for(int i=0; i<pPar->STAT_RUNS; i++){
-            stat_run(pA,pE,pPar,i);
+            stat_run(pA,pE,pPar,i,p_file);
         }
+        fclose(p_file);
         
         cout << "End of Program" << endl;
     }
