@@ -21,7 +21,8 @@ double max(double a, double b){
     return b;
 }
 
-bool test_functions = false;
+bool test_functions = true;
+bool reset_id = false;
 
 ///////////////////// %%%%%%%%%%%%%%%%%% BEGIN CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
 
@@ -199,6 +200,7 @@ public:
     void multi_agent_different_path_different_poi();
     void communication_test();
     void three_agents_limited_joy();
+    void three_rover_not_surfacing();
 };
 
 ///////////////////// %%%%%%%%%%%%%%%%%% END CLASS DECLARATIONS %%%%%%%%%%%%%%%%%% /////////////////////
@@ -223,6 +225,11 @@ void agent::init(parameters* pPar){
     
     /// give each agent a unique ID;
     static int x;
+    if (reset_id) {
+        id = 0;
+        x = 0;
+        reset_id = false;
+    }
     id = x;
     x++;
     
@@ -309,7 +316,8 @@ void agent::establish_comms_links(vector<agent>* pA, parameters* pPar){
         if(dist < pPar->P2P_commlink_dist){
             comms_P2P_available.push_back(true);
         }
-        else if(V.z >= 0 && pA->at(a).V.z >= 0 && pPar->allow_general_comm_link){
+        else if((V.z >= 0) && (pA->at(a).V.z >= 0) && (pPar->allow_general_comm_link)){
+//        else if((V.z >= 0)  && (pPar->allow_general_comm_link)){
             comms_P2P_available.push_back(true);
         }
         else{
@@ -485,7 +493,7 @@ void agent::calc_limited_difference(vector<agent>* pA, environment* pE, paramete
         }
     }
     
-    /// calculated limg based on the closest of all of these.
+    /// calculated limcf based on the closest of all of these.
     double value, delta, contribution;
     for(int p=0; p<pPar->num_POI; p++){
         value = pE->POIs.at(p).val;
@@ -812,6 +820,11 @@ void tests::single_agent_multi_poi(){
 
 void tests::single_agent_check_waypoints_poi(){
     bool VERBOSE = false;
+    reset_id = true;
+    A.clear();
+    E.POIs.clear();
+    pA->clear();
+    
     //Set all the values
     pPar->num_agents = 1;
     pPar->num_vehicles = 1;
@@ -879,19 +892,17 @@ void tests::single_agent_check_waypoints_poi(){
         if(VERBOSE){
             cout<<"Location of Agent::"<<endl;
             cout<<A.at(0).V.x<<"\t"<<A.at(0).V.y<<"\t"<<A.at(0).V.z<<endl;
-            cout<<"Location of POI::"<<endl;
-            cout<<E.POIs.at(0).x<<"\t"<<E.POIs.at(0).y<<"\t"<<E.POIs.at(0).z<<endl;
-            cout<<E.POIs.at(1).x<<"\t"<<E.POIs.at(1).y<<"\t"<<E.POIs.at(1).z<<endl;
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).observe_poi_distances(pE,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).establish_comms_links(pA,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).exchange_information_P2P(pA,pPar);
         }
         
-        pA->at(0).observe_poi_distances(pE,pPar);
-        pA->at(0).establish_comms_links(pA,pPar);
-        pA->at(0).exchange_information_P2P(pA,pPar);
-        
-        if(VERBOSE){
-            cout<<A.at(0).my_observations.at(0).observation_distance<<endl;
-            cout<<A.at(0).my_observations.at(1).observation_distance<<endl;
-        }
     }
     //calculate the values
     for(int a=0; a<pPar->num_agents; a++){
@@ -904,35 +915,34 @@ void tests::single_agent_check_waypoints_poi(){
     }
     //assert to check all values to calculated values
     if(VERBOSE){
-        cout<<"fitness:"<<A.at(0).policies.at(0).fitness<<endl;                         //fitness;
-        cout<<"local::"<<A.at(0).policies.at(0).local<<endl;                            //local;
-        cout<<"true_global::"<<A.at(0).policies.at(0).true_global<<endl;                //true_global;
-        cout<<"true_difference::"<<A.at(0).policies.at(0).true_difference<<endl;            //true_difference;
-        cout<<"limited_global::"<<A.at(0).policies.at(0).limited_global<<endl;          //limited_global;
+        cout<<"fitness:"<<A.at(0).policies.at(0).fitness<<endl;                   //fitness;
+        cout<<"local::"<<A.at(0).policies.at(0).local<<endl;                      //local;
+        cout<<"true_global::"<<A.at(0).policies.at(0).true_global<<endl;          //true_global;
+        cout<<"true_difference::"<<A.at(0).policies.at(0).true_difference<<endl;  //true_difference;
+        cout<<"limited_global::"<<A.at(0).policies.at(0).limited_global<<endl;    //limited_global;
         cout<<"limited_difference::"<<A.at(0).policies.at(0).limited_difference<<endl;  //limited_difference;
     }
     
     assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).local);
     assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).true_global);
-    assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).true_difference);
-    assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).limited_global );
-    assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).limited_difference);
-    
-    assert(A.at(0).policies.at(0).local == A.at(0).policies.at(0).true_global);
-    assert(A.at(0).policies.at(0).local == A.at(0).policies.at(0).true_difference);
-    assert(A.at(0).policies.at(0).local == A.at(0).policies.at(0).limited_global);
-    assert(A.at(0).policies.at(0).local== A.at(0).policies.at(0).limited_difference);
-    
-    assert(A.at(0).policies.at(0).true_difference == A.at(0).policies.at(0).limited_global);
+    assert(A.at(0).policies.at(0).true_global == A.at(0).policies.at(0).limited_global);
     assert(A.at(0).policies.at(0).true_difference == A.at(0).policies.at(0).limited_difference);
     
-    assert(A.at(0).policies.at(0).limited_global == A.at(0).policies.at(0).limited_difference);
-    
     //
+    reset_id = false;
 }
 
 void tests::multi_agent_different_path(){
     bool VERBOSE = false;
+    reset_id = true;
+    A.clear();
+    E.POIs.clear();
+    pA->clear();
+//    reset_id = true;
+//    A.clear();
+//    pA->clear();
+//    E.POIs.clear();
+    
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -940,7 +950,7 @@ void tests::multi_agent_different_path(){
     pPar->num_POI = 2;
     pPar->num_waypoints =6;
     pPar->maximum_observation_distance = 1;
-    pPar->P2P_commlink_dist=1;
+    pPar->P2P_commlink_dist=0;
     
     //Create a agent and initalize its values
     agent a_1;
@@ -1041,14 +1051,20 @@ void tests::multi_agent_different_path(){
             }
             
             if(VERBOSE){
-                cout<<"Location of Agent::"<<endl;
+                cout<<"Location of Agent::"<<rover_number<<endl;
                 cout<<A.at(rover_number).V.x<<"\t"<<A.at(rover_number).V.y<<"\t"<<A.at(rover_number).V.z<<endl;
-                cout<<"Location of POI::"<<endl;
-                cout<<E.POIs.at(0).x<<"\t"<<E.POIs.at(0).y<<"\t"<<E.POIs.at(0).z<<endl;
-                cout<<E.POIs.at(1).x<<"\t"<<E.POIs.at(1).y<<"\t"<<E.POIs.at(1).z<<endl;
+                //pA->at(a).V.z
+                cout<<pA->at(rover_number).V.x<<"\t"<<pA->at(rover_number).V.y<<"\t"<<pA->at(rover_number).V.z<<endl;
+                
             }
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).observe_poi_distances(pE,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).establish_comms_links(pA,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).exchange_information_P2P(pA,pPar);
         }
     }
@@ -1065,12 +1081,12 @@ void tests::multi_agent_different_path(){
     //assert to check all values to calculated values
     if(VERBOSE){
         for (int rover_number = 0 ; rover_number<pPar->num_agents; rover_number++) {
-            cout<<"fitness:"<<A.at(0).policies.at(0).fitness<<endl;                         //fitness;
-            cout<<"local::"<<A.at(0).policies.at(0).local<<endl;                            //local;
-            cout<<"true_global::"<<A.at(0).policies.at(0).true_global<<endl;                //true_global;
-            cout<<"true_difference::"<<A.at(0).policies.at(0).true_difference<<endl;            //true_difference;
-            cout<<"limited_global::"<<A.at(0).policies.at(0).limited_global<<endl;          //limited_global;
-            cout<<"limited_difference::"<<A.at(0).policies.at(0).limited_difference<<endl;  //limited_difference;
+            cout<<"fitness:"<<A.at(rover_number).policies.at(0).fitness<<endl;      //fitness;
+            cout<<"local::"<<A.at(rover_number).policies.at(0).local<<endl;                //local;
+            cout<<"true_global::"<<A.at(rover_number).policies.at(0).true_global<<endl; //true_global;
+            cout<<"true_difference::"<<A.at(rover_number).policies.at(0).true_difference<<endl;//true_difference;
+            cout<<"limited_global::"<<A.at(rover_number).policies.at(0).limited_global<<endl; //limited_global;
+        cout<<"limited_difference::"<<A.at(rover_number).policies.at(0).limited_difference<<endl;//limited_difference;
             
         }
     }
@@ -1082,10 +1098,16 @@ void tests::multi_agent_different_path(){
     assert(A.at(0).policies.at(0).limited_global == A.at(1).policies.at(0).limited_global );
     assert(A.at(0).policies.at(0).limited_difference == A.at(1).policies.at(0).limited_difference);
     
+    reset_id = false;
 }
 
 void tests::multi_agent_same_path_no_joy(){
     bool VERBOSE = false;
+    reset_id = true;
+    A.clear();
+    E.POIs.clear();
+    pA->clear();
+    
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1174,20 +1196,24 @@ void tests::multi_agent_same_path_no_joy(){
             assert(A.at(rover_number).policies.at(0).WP.at(time_step).x == A.at(rover_number).V.x);
             assert(A.at(rover_number).policies.at(0).WP.at(time_step).y == A.at(rover_number).V.y);
             assert(A.at(rover_number).policies.at(0).WP.at(time_step).z == A.at(rover_number).V.z);
-            
-            
+        
+        
             if(VERBOSE){
                 cout<<"Location of Agent::"<<rover_number<<endl;
                 cout<<A.at(rover_number).V.x<<"\t"<<A.at(rover_number).V.y<<"\t"<<A.at(rover_number).V.z<<endl;
-                //                cout<<"Location of POI::"<<endl;
-                //                cout<<E.POIs.at(0).x<<"\t"<<E.POIs.at(0).y<<"\t"<<E.POIs.at(0).z<<endl;
-                //                cout<<E.POIs.at(1).x<<"\t"<<E.POIs.at(1).y<<"\t"<<E.POIs.at(1).z<<endl;
+                
             }
-            pA->at(rover_number).observe_poi_distances(pE,pPar);
-            pA->at(rover_number).establish_comms_links(pA,pPar);
-            pA->at(rover_number).exchange_information_P2P(pA,pPar);
-            
         }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).observe_poi_distances(pE,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).establish_comms_links(pA,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).exchange_information_P2P(pA,pPar);
+        }
+        
         time_step++;
     }
     
@@ -1203,12 +1229,12 @@ void tests::multi_agent_same_path_no_joy(){
     //assert to check all values to calculated values
     if(VERBOSE){
         for (int rover_number = 0 ; rover_number<pPar->num_agents; rover_number++) {
-            cout<<"fitness:"<<A.at(0).policies.at(0).fitness<<endl;                         //fitness;
-            cout<<"local::"<<A.at(0).policies.at(0).local<<endl;                            //local;
-            cout<<"true_global::"<<A.at(0).policies.at(0).true_global<<endl;                //true_global;
-            cout<<"true_difference::"<<A.at(0).policies.at(0).true_difference<<endl;            //true_difference;
-            cout<<"limited_global::"<<A.at(0).policies.at(0).limited_global<<endl;          //limited_global;
-            cout<<"limited_difference::"<<A.at(0).policies.at(0).limited_difference<<endl;  //limited_difference;
+            cout<<"fitness:"<<A.at(rover_number).policies.at(0).fitness<<endl;                         //fitness;
+            cout<<"local::"<<A.at(rover_number).policies.at(0).local<<endl;                            //local;
+            cout<<"true_global::"<<A.at(rover_number).policies.at(0).true_global<<endl;                //true_global;
+            cout<<"true_difference::"<<A.at(rover_number).policies.at(0).true_difference<<endl;            //true_difference;
+            cout<<"limited_global::"<<A.at(rover_number).policies.at(0).limited_global<<endl;          //limited_global;
+            cout<<"limited_difference::"<<A.at(rover_number).policies.at(0).limited_difference<<endl;  //limited_difference;
             
         }
     }
@@ -1224,6 +1250,10 @@ void tests::multi_agent_same_path_no_joy(){
 
 void tests::multi_agent_same_path_with_joy(){
     bool VERBOSE = false;
+    reset_id = true;
+    A.clear();
+    E.POIs.clear();
+    pA->clear();
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1321,14 +1351,18 @@ void tests::multi_agent_same_path_with_joy(){
             if(VERBOSE){
                 cout<<"Location of Agent::"<<rover_number<<endl;
                 cout<<A.at(rover_number).V.x<<"\t"<<A.at(rover_number).V.y<<"\t"<<A.at(rover_number).V.z<<endl;
-                //                cout<<"Location of POI::"<<endl;
-                //                cout<<E.POIs.at(0).x<<"\t"<<E.POIs.at(0).y<<"\t"<<E.POIs.at(0).z<<endl;
-                //                cout<<E.POIs.at(1).x<<"\t"<<E.POIs.at(1).y<<"\t"<<E.POIs.at(1).z<<endl;
             }
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).observe_poi_distances(pE,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).establish_comms_links(pA,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).exchange_information_P2P(pA,pPar);
         }
+        
     }
     
     //calculate the values
@@ -1353,10 +1387,23 @@ void tests::multi_agent_same_path_with_joy(){
         }
     }
     
+    assert(A.at(0).policies.at(0).fitness == A.at(1).policies.at(0).fitness);
+    assert(A.at(0).policies.at(0).local == A.at(1).policies.at(0).local);
+    assert(A.at(0).policies.at(0).true_global == A.at(1).policies.at(0).true_global);
+    assert(A.at(0).policies.at(0).true_difference == A.at(1).policies.at(0).true_difference);
+    assert(A.at(0).policies.at(0).limited_global == A.at(1).policies.at(0).limited_global );
+    assert(A.at(0).policies.at(0).limited_difference == A.at(1).policies.at(0).limited_difference);
+
+    
 }
 
 void tests::multi_agent_different_path_different_poi(){
-    bool VERBOSE = true;
+    bool VERBOSE = false;
+    reset_id = true;
+    A.clear();
+    E.POIs.clear();
+    pA->clear();
+    
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1459,8 +1506,14 @@ void tests::multi_agent_different_path_different_poi(){
                 cout<<"Location of Agent::"<<rover_number<<endl;
                 cout<<A.at(rover_number).V.x<<"\t"<<A.at(rover_number).V.y<<"\t"<<A.at(rover_number).V.z<<endl;
             }
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).observe_poi_distances(pE,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).establish_comms_links(pA,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).exchange_information_P2P(pA,pPar);
         }
     }
@@ -1488,37 +1541,23 @@ void tests::multi_agent_different_path_different_poi(){
             
         }
     }
-    cout<<"Check Location"<<endl;
-    
-    if(VERBOSE){
-        
-        for(int a=0; a<pPar->num_agents; a++){
-            cout << "AGENT " << a << ":\t";
-            for(int p=0; p<pPar->num_POI; p++){
-                cout << pA->at(a).my_observations.at(p).observation_distance << "\t";
-            }
-            cout << endl;
-        }
-        cout << endl;
-        
-        for(int a=0; a<pPar->num_agents; a++){
-            for(int b = 0; b<pPar->num_agents; b++){
-                
-                cout << "AGENT " << a << "'s BELIEFS ABOUT AGENT " << b << ":\t";
-                for(int p=0; p<pPar->num_POI; p++){
-                    cout << pA->at(a).others_observations.at(b).at(p).observation_distance << "\t";
-                }
-                cout << endl;
-            }
-            cout << endl;
-        }
-        
-    }
-    
+    assert(A.at(0).policies.at(0).fitness == A.at(1).policies.at(0).fitness);
+    assert(A.at(0).policies.at(0).local == A.at(1).policies.at(0).local);
+    assert(A.at(0).policies.at(0).true_global == A.at(1).policies.at(0).true_global);
+    assert(A.at(0).policies.at(0).true_difference == A.at(1).policies.at(0).true_difference);
+    assert(A.at(0).policies.at(0).limited_global == A.at(1).policies.at(0).limited_global );
+    assert(A.at(0).policies.at(0).limited_difference == A.at(1).policies.at(0).limited_difference);
+
+//    cout<<"Check Location"<<endl;
 }
 
 void tests::communication_test(){
     bool VERBOSE = false;
+    reset_id = true;
+    A.clear();
+    E.POIs.clear();
+    pA->clear();
+    
     //Set all the values
     pPar->num_agents = 2;
     pPar->num_vehicles = 2;
@@ -1621,8 +1660,14 @@ void tests::communication_test(){
                 cout<<"Location of Agent::"<<rover_number<<endl;
                 cout<<A.at(rover_number).V.x<<"\t"<<A.at(rover_number).V.y<<"\t"<<A.at(rover_number).V.z<<endl;
             }
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).observe_poi_distances(pE,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).establish_comms_links(pA,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
             pA->at(rover_number).exchange_information_P2P(pA,pPar);
         }
     }
@@ -1650,28 +1695,44 @@ void tests::communication_test(){
             
         }
     }
-    cout<<"Check Location"<<endl;
+    
+    assert(A.at(0).policies.at(0).fitness == A.at(1).policies.at(0).fitness);
+    assert(A.at(0).policies.at(0).local == A.at(1).policies.at(0).local);
+    assert(A.at(0).policies.at(0).true_global == A.at(1).policies.at(0).true_global);
+    assert(A.at(0).policies.at(0).true_difference == A.at(1).policies.at(0).true_difference);
+    assert(A.at(0).policies.at(0).limited_global == A.at(1).policies.at(0).limited_global );
+    assert(A.at(0).policies.at(0).limited_difference == A.at(1).policies.at(0).limited_difference);
+
+//    cout<<"Check Location"<<endl;
     
     
 }
 
 void tests::three_agents_limited_joy(){
     bool VERBOSE = false;
+    reset_id = true;
+    A.clear();
+    E.POIs.clear();
+    pA->clear();
+    
     //Set all the values
-    pPar->num_agents = 2;
-    pPar->num_vehicles = 2;
+    pPar->num_agents = 3;
+    pPar->num_vehicles = 3;
     pPar->pop_size = 1;
-    pPar->num_POI = 6;
-    pPar->num_waypoints = 14;
+    pPar->num_POI = 5;
+    pPar->num_waypoints = 7;
     pPar->maximum_observation_distance = 1;
     pPar->P2P_commlink_dist = 1;
     
     //Create a agent and initalize its values
     agent a_1;
     agent a_2;
+    agent a_3;
     A.clear();
     A.push_back(a_1);
     A.push_back(a_2);
+    A.push_back(a_3);
+    
     for (int temp_num_agents = 0; temp_num_agents<pPar->num_agents; temp_num_agents++) {
         A.at(temp_num_agents).init(pPar);
     }
@@ -1683,23 +1744,342 @@ void tests::three_agents_limited_joy(){
     double delta = 0.001; // This value is used in calculation of local values
     
     /// Create location for POI
-    //Food for agent_1
-    for (int temp=0, temp_1=10; temp<3; temp++) {
-        E.POIs.at(temp).x =temp_1;
-        E.POIs.at(temp).y = temp_1;
-        E.POIs.at(temp).z = -temp_1;
-        E.POIs.at(temp).val = 100;
-        temp_1 += 5;
+    E.POIs.at(0).x =5;
+    E.POIs.at(0).y =5;
+    E.POIs.at(0).z =-5;
+    E.POIs.at(1).x =25;
+    E.POIs.at(1).y =25;
+    E.POIs.at(1).z =-25;
+    E.POIs.at(2).x =35;
+    E.POIs.at(2).y =35;
+    E.POIs.at(2).z =-35;
+    E.POIs.at(3).x =50;
+    E.POIs.at(3).y =50;
+    E.POIs.at(3).z =-50;
+    E.POIs.at(4).x =78;
+    E.POIs.at(4).y =78;
+    E.POIs.at(4).z =-78;
+    E.POIs.at(0).val=100;
+    E.POIs.at(1).val=100;
+    E.POIs.at(2).val=100;
+    E.POIs.at(3).val=100;
+    E.POIs.at(4).val=100;
+    
+    
+    //Agent way point
+    //Agent 1
+    for (int temp =0,temp_1 =0; temp<7; temp++) {
+        A.at(0).policies.at(0).WP.at(temp).x=temp_1;
+        A.at(0).policies.at(0).WP.at(temp).y=temp_1;
+        A.at(0).policies.at(0).WP.at(temp).z=-temp_1;
+        temp_1+=5;
+        if (temp == 6) {
+            A.at(0).policies.at(0).WP.at(temp).x=120;
+            A.at(0).policies.at(0).WP.at(temp).y=120;
+            A.at(0).policies.at(0).WP.at(temp).z=0;
+        }
     }
-    //Food for agent_2
-    for (int temp=3, temp_1=100; temp<6; temp++) {
-        E.POIs.at(temp).x =temp_1;
-        E.POIs.at(temp).y = temp_1;
-        E.POIs.at(temp).z = -temp_1;
-        E.POIs.at(temp).val = 100;
-        temp_1 -= 25;
+    //Agent 2
+    A.at(1).policies.at(0).WP.at(0).x = 30;
+    A.at(1).policies.at(0).WP.at(0).y = 30;
+    A.at(1).policies.at(0).WP.at(0).z = 0;
+    A.at(1).policies.at(0).WP.at(1).x = 25;
+    A.at(1).policies.at(0).WP.at(1).y = 25;
+    A.at(1).policies.at(0).WP.at(1).z = -25;
+    A.at(1).policies.at(0).WP.at(2).x = 10;
+    A.at(1).policies.at(0).WP.at(2).y = 10;
+    A.at(1).policies.at(0).WP.at(2).z = -10;
+    A.at(1).policies.at(0).WP.at(3).x = 50;
+    A.at(1).policies.at(0).WP.at(3).y = 50;
+    A.at(1).policies.at(0).WP.at(3).z = -50;
+    A.at(1).policies.at(0).WP.at(4).x = 60;
+    A.at(1).policies.at(0).WP.at(4).y = 60;
+    A.at(1).policies.at(0).WP.at(4).z = -60;
+    A.at(1).policies.at(0).WP.at(5).x = 110;
+    A.at(1).policies.at(0).WP.at(5).y = 110;
+    A.at(1).policies.at(0).WP.at(5).z = -110;
+    A.at(1).policies.at(0).WP.at(6).x = 140;
+    A.at(1).policies.at(0).WP.at(6).y = 140;
+    A.at(1).policies.at(0).WP.at(6).z = 0;
+    //Agent 2
+    A.at(2).policies.at(0).WP.at(0).x = 40;
+    A.at(2).policies.at(0).WP.at(0).y = 40;
+    A.at(2).policies.at(0).WP.at(0).z = 0;
+    A.at(2).policies.at(0).WP.at(1).x = 40;
+    A.at(2).policies.at(0).WP.at(1).y = 40;
+    A.at(2).policies.at(0).WP.at(1).z = -40;
+    A.at(2).policies.at(0).WP.at(2).x = 35;
+    A.at(2).policies.at(0).WP.at(2).y = 35;
+    A.at(2).policies.at(0).WP.at(2).z = -35;
+    A.at(2).policies.at(0).WP.at(3).x = 50;
+    A.at(2).policies.at(0).WP.at(3).y = 50;
+    A.at(2).policies.at(0).WP.at(3).z = -50;
+    A.at(2).policies.at(0).WP.at(4).x = 75;
+    A.at(2).policies.at(0).WP.at(4).y = 75;
+    A.at(2).policies.at(0).WP.at(4).z = -75;
+    A.at(2).policies.at(0).WP.at(5).x = 100;
+    A.at(2).policies.at(0).WP.at(5).y = 100;
+    A.at(2).policies.at(0).WP.at(5).z = -100;
+    A.at(2).policies.at(0).WP.at(6).x = 100;
+    A.at(2).policies.at(0).WP.at(6).y = 100;
+    A.at(2).policies.at(0).WP.at(6).z = 0;
+    
+    //Set in agents along vehicles in water
+    for (int rover_number = 0; rover_number<pPar->num_agents; rover_number++) {
+        A.at(rover_number).start_generation(); // all policies have everything to zero
+        A.at(rover_number).start_simulation(pPar);
+        A.at(rover_number).select_fresh_policy();
+        A.at(rover_number).V.start_based_on_policy(A.at(rover_number).policies.at(0), pPar->num_agents); //placed at first waypoint
     }
+    
+    //each iteration move in different path
+    //for each time step
+    for (int time_step = 0; time_step<A.at(0).policies.at(0).WP.size(); time_step++) {
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            int dex = pA->at(rover_number).active_policy_index;
+            policy P = pA->at(rover_number).policies.at(dex);
+            pA->at(rover_number).V.move_to_wp(P,time_step);
+            
+            assert(A.at(rover_number).policies.at(0).WP.at(time_step).x == A.at(rover_number).V.x);
+            assert(A.at(rover_number).policies.at(0).WP.at(time_step).y == A.at(rover_number).V.y);
+            assert(A.at(rover_number).policies.at(0).WP.at(time_step).z == A.at(rover_number).V.z);
+            
+            if(VERBOSE){
+                cout<<"Location of Agent::"<<rover_number<<endl;
+                cout<<A.at(rover_number).V.x<<"\t"<<A.at(rover_number).V.y<<"\t"<<A.at(rover_number).V.z<<endl;
+            }
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).observe_poi_distances(pE,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).establish_comms_links(pA,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).exchange_information_P2P(pA,pPar);
+        }
+    }
+    
+    //calculate the values
+    for(int a=0; a<pPar->num_agents; a++){
+        pA->at(a).calc_local(pA,pE,pPar);
+        pA->at(a).calc_true_global(pA,pE,pPar);
+        pA->at(a).calc_true_difference(pA,pE,pPar);
+        pA->at(a).calc_limited_global(pA,pE,pPar);
+        pA->at(a).calc_limited_difference(pA,pE,pPar);
+        pA->at(a).LGD_to_fitness(pA,pE,pPar);
+    }
+    
+    if(VERBOSE){
+        for (int rover_number = 0 ; rover_number<pPar->num_agents; rover_number++) {
+            cout<<"For rover::"<<rover_number<<endl;
+            cout<<"fitness:"<<A.at(rover_number).policies.at(0).fitness<<endl;            //fitness;
+            cout<<"local::"<<A.at(rover_number).policies.at(0).local<<endl;               //local;
+            cout<<"true_global::"<<A.at(rover_number).policies.at(0).true_global<<endl; //true_global;
+            cout<<"true_difference::"<<A.at(rover_number).policies.at(0).true_difference<<endl;  //true_difference;
+            cout<<"limited_global::"<<A.at(rover_number).policies.at(0).limited_global<<endl;//limited_global;
+            cout<<"limited_difference::"<<A.at(rover_number).policies.at(0).limited_difference<<endl; //limited_difference;
+            cout<<endl;
+            
+        }
+    }
+    assert(A.at(0).policies.at(0).limited_global == A.at(0).policies.at(0).true_global);
+    assert(A.at(1).policies.at(0).limited_global == A.at(1).policies.at(0).true_global);
+    assert(A.at(2).policies.at(0).limited_global == A.at(2).policies.at(0).true_global);
+    assert(A.at(0).policies.at(0).true_difference == A.at(0).policies.at(0).limited_difference);
+    assert(A.at(1).policies.at(0).true_difference == A.at(1).policies.at(0).limited_difference);
+    assert(A.at(2).policies.at(0).true_difference == A.at(2).policies.at(0).limited_difference);
+    assert(A.at(2).policies.at(0).true_global == A.at(1).policies.at(0).true_global);
+    assert(A.at(2).policies.at(0).true_global == A.at(0).policies.at(0).true_global);
+    
+    
+}
 
+void tests::three_rover_not_surfacing(){
+    bool VERBOSE = false;
+    reset_id = true;
+    A.clear();
+    E.POIs.clear();
+    pA->clear();
+    
+    //Set all the values
+    pPar->num_agents = 3;
+    pPar->num_vehicles = 3;
+    pPar->pop_size = 1;
+    pPar->num_POI = 5;
+    pPar->num_waypoints = 7;
+    pPar->maximum_observation_distance = 1;
+    pPar->P2P_commlink_dist = 1;
+    
+    //Create a agent and initalize its values
+    agent a_1;
+    agent a_2;
+    agent a_3;
+    A.clear();
+    A.push_back(a_1);
+    A.push_back(a_2);
+    A.push_back(a_3);
+    
+    for (int temp_num_agents = 0; temp_num_agents<pPar->num_agents; temp_num_agents++) {
+        A.at(temp_num_agents).init(pPar);
+    }
+    
+    
+    //Create environment
+    E.init(pPar);
+    
+    double delta = 0.001; // This value is used in calculation of local values
+    
+    /// Create location for POI
+    E.POIs.at(0).x =5;
+    E.POIs.at(0).y =5;
+    E.POIs.at(0).z =-5;
+    E.POIs.at(1).x =25;
+    E.POIs.at(1).y =25;
+    E.POIs.at(1).z =-25;
+    E.POIs.at(2).x =35;
+    E.POIs.at(2).y =35;
+    E.POIs.at(2).z =-35;
+    E.POIs.at(3).x =50;
+    E.POIs.at(3).y =50;
+    E.POIs.at(3).z =-50;
+    E.POIs.at(4).x =78;
+    E.POIs.at(4).y =78;
+    E.POIs.at(4).z =-78;
+    E.POIs.at(0).val=100;
+    E.POIs.at(1).val=100;
+    E.POIs.at(2).val=100;
+    E.POIs.at(3).val=100;
+    E.POIs.at(4).val=100;
+    
+    
+    //Agent way point
+    //Agent 1
+    for (int temp =0,temp_1 =0; temp<7; temp++) {
+        A.at(0).policies.at(0).WP.at(temp).x=temp_1;
+        A.at(0).policies.at(0).WP.at(temp).y=temp_1;
+        A.at(0).policies.at(0).WP.at(temp).z=-temp_1;
+        temp_1+=5;
+        if (temp == 6) {
+            A.at(0).policies.at(0).WP.at(temp).x=120;
+            A.at(0).policies.at(0).WP.at(temp).y=120;
+            A.at(0).policies.at(0).WP.at(temp).z=-160;
+        }
+    }
+    //Agent 2
+    A.at(1).policies.at(0).WP.at(0).x = 30;
+    A.at(1).policies.at(0).WP.at(0).y = 30;
+    A.at(1).policies.at(0).WP.at(0).z = 0;
+    A.at(1).policies.at(0).WP.at(1).x = 25;
+    A.at(1).policies.at(0).WP.at(1).y = 25;
+    A.at(1).policies.at(0).WP.at(1).z = -25;
+    A.at(1).policies.at(0).WP.at(2).x = 10;
+    A.at(1).policies.at(0).WP.at(2).y = 10;
+    A.at(1).policies.at(0).WP.at(2).z = -10;
+    A.at(1).policies.at(0).WP.at(3).x = 50;
+    A.at(1).policies.at(0).WP.at(3).y = 50;
+    A.at(1).policies.at(0).WP.at(3).z = -50;
+    A.at(1).policies.at(0).WP.at(4).x = 60;
+    A.at(1).policies.at(0).WP.at(4).y = 60;
+    A.at(1).policies.at(0).WP.at(4).z = -60;
+    A.at(1).policies.at(0).WP.at(5).x = 110;
+    A.at(1).policies.at(0).WP.at(5).y = 110;
+    A.at(1).policies.at(0).WP.at(5).z = -110;
+    A.at(1).policies.at(0).WP.at(6).x = 140;
+    A.at(1).policies.at(0).WP.at(6).y = 140;
+    A.at(1).policies.at(0).WP.at(6).z = -150;
+    //Agent 2
+    A.at(2).policies.at(0).WP.at(0).x = 40;
+    A.at(2).policies.at(0).WP.at(0).y = 40;
+    A.at(2).policies.at(0).WP.at(0).z = 0;
+    A.at(2).policies.at(0).WP.at(1).x = 40;
+    A.at(2).policies.at(0).WP.at(1).y = 40;
+    A.at(2).policies.at(0).WP.at(1).z = -40;
+    A.at(2).policies.at(0).WP.at(2).x = 35;
+    A.at(2).policies.at(0).WP.at(2).y = 35;
+    A.at(2).policies.at(0).WP.at(2).z = -35;
+    A.at(2).policies.at(0).WP.at(3).x = 50;
+    A.at(2).policies.at(0).WP.at(3).y = 50;
+    A.at(2).policies.at(0).WP.at(3).z = -50;
+    A.at(2).policies.at(0).WP.at(4).x = 75;
+    A.at(2).policies.at(0).WP.at(4).y = 75;
+    A.at(2).policies.at(0).WP.at(4).z = -75;
+    A.at(2).policies.at(0).WP.at(5).x = 100;
+    A.at(2).policies.at(0).WP.at(5).y = 100;
+    A.at(2).policies.at(0).WP.at(5).z = -100;
+    A.at(2).policies.at(0).WP.at(6).x = 100;
+    A.at(2).policies.at(0).WP.at(6).y = 100;
+    A.at(2).policies.at(0).WP.at(6).z = -400;
+    
+    //Set in agents along vehicles in water
+    for (int rover_number = 0; rover_number<pPar->num_agents; rover_number++) {
+        A.at(rover_number).start_generation(); // all policies have everything to zero
+        A.at(rover_number).start_simulation(pPar);
+        A.at(rover_number).select_fresh_policy();
+        A.at(rover_number).V.start_based_on_policy(A.at(rover_number).policies.at(0), pPar->num_agents); //placed at first waypoint
+    }
+    
+    //each iteration move in different path
+    //for each time step
+    for (int time_step = 0; time_step<A.at(0).policies.at(0).WP.size(); time_step++) {
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            int dex = pA->at(rover_number).active_policy_index;
+            policy P = pA->at(rover_number).policies.at(dex);
+            pA->at(rover_number).V.move_to_wp(P,time_step);
+            
+            assert(A.at(rover_number).policies.at(0).WP.at(time_step).x == A.at(rover_number).V.x);
+            assert(A.at(rover_number).policies.at(0).WP.at(time_step).y == A.at(rover_number).V.y);
+            assert(A.at(rover_number).policies.at(0).WP.at(time_step).z == A.at(rover_number).V.z);
+            
+            if(VERBOSE){
+                cout<<"Location of Agent::"<<rover_number<<endl;
+                cout<<A.at(rover_number).V.x<<"\t"<<A.at(rover_number).V.y<<"\t"<<A.at(rover_number).V.z<<endl;
+            }
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).observe_poi_distances(pE,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).establish_comms_links(pA,pPar);
+        }
+        for (int rover_number =0 ; rover_number<pPar->num_agents; rover_number++) {
+            pA->at(rover_number).exchange_information_P2P(pA,pPar);
+        }
+    }
+    
+    //calculate the values
+    for(int a=0; a<pPar->num_agents; a++){
+        pA->at(a).calc_local(pA,pE,pPar);
+        pA->at(a).calc_true_global(pA,pE,pPar);
+        pA->at(a).calc_true_difference(pA,pE,pPar);
+        pA->at(a).calc_limited_global(pA,pE,pPar);
+        pA->at(a).calc_limited_difference(pA,pE,pPar);
+        pA->at(a).LGD_to_fitness(pA,pE,pPar);
+    }
+    
+    if(VERBOSE){
+        for (int rover_number = 0 ; rover_number<pPar->num_agents; rover_number++) {
+            cout<<"For rover::"<<rover_number<<endl;
+            cout<<"fitness:"<<A.at(rover_number).policies.at(0).fitness<<endl;            //fitness;
+            cout<<"local::"<<A.at(rover_number).policies.at(0).local<<endl;               //local;
+            cout<<"true_global::"<<A.at(rover_number).policies.at(0).true_global<<endl; //true_global;
+            cout<<"true_difference::"<<A.at(rover_number).policies.at(0).true_difference<<endl;  //true_difference;
+            cout<<"limited_global::"<<A.at(rover_number).policies.at(0).limited_global<<endl;//limited_global;
+            cout<<"limited_difference::"<<A.at(rover_number).policies.at(0).limited_difference<<endl; //limited_difference;
+            cout<<endl;
+            
+        }
+    }
+    
+    assert(A.at(0).policies.at(0).fitness == A.at(0).policies.at(0).local);
+    assert(A.at(1).policies.at(0).fitness == A.at(1).policies.at(0).local);
+    assert(A.at(2).policies.at(0).fitness == A.at(2).policies.at(0).local);
+    assert(A.at(0).policies.at(0).true_difference <= A.at(0).policies.at(0).limited_difference);
+    assert(A.at(1).policies.at(0).true_difference <= A.at(1).policies.at(0).limited_difference);
+    assert(A.at(2).policies.at(0).true_difference <= A.at(2).policies.at(0).limited_difference);
+    assert(A.at(0).policies.at(0).true_global >= A.at(0).policies.at(0).limited_global);
+    assert(A.at(1).policies.at(0).true_global >= A.at(1).policies.at(0).limited_global);
+    assert(A.at(2).policies.at(0).true_global >= A.at(2).policies.at(0).limited_global);
 }
 
 /////// END TESTS FUNCTIONS ///////
@@ -1853,7 +2233,11 @@ void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum){
     }
     for(int a=0; a<pPar->num_agents; a++){
         pA->at(a).observe_poi_distances(pE,pPar);
+    }
+    for(int a=0; a<pPar->num_agents; a++){
         pA->at(a).establish_comms_links(pA,pPar);
+    }
+    for(int a=0; a<pPar->num_agents; a++){
         pA->at(a).exchange_information_P2P(pA,pPar);
     }
 }
@@ -1868,15 +2252,16 @@ int main() {
     //return 0;
     if (test_functions) {
         tests T_obj;
-//        T_obj.init();
-//        T_obj.single_agent_multi_poi();
-//        T_obj.single_agent_check_waypoints_poi();
-//        T_obj.multi_agent_different_path();
-//        T_obj.multi_agent_same_path_no_joy();   //no communication
-//        T_obj.multi_agent_same_path_with_joy();    //communication
+        T_obj.init();
+        T_obj.single_agent_multi_poi();
+        T_obj.single_agent_check_waypoints_poi();
+        T_obj.multi_agent_different_path();
+        T_obj.multi_agent_same_path_no_joy();   //no communication
+        T_obj.multi_agent_same_path_with_joy();    //communication
         T_obj.multi_agent_different_path_different_poi(); //They travel different path and look at different POI's
-//        T_obj.communication_test(); //They travel different path and look at different POI's
- //      T_obj.three_agents_limited_joy();
+        T_obj.communication_test(); //They travel different path and look at different POI's
+       T_obj.three_agents_limited_joy();
+        T_obj.three_rover_not_surfacing();
     }
     
     if(!test_functions){
