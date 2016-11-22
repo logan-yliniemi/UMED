@@ -38,9 +38,9 @@ class parameters;
 class testparameters;
 class tests;
 
-void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen,FILE* p_file);
-void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen,FILE* p_file);
-void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR,FILE* p_file);
+void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen,FILE* p_file,vector<double>* p_best_true_global);
+void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen,FILE* p_file,vector<double>* p_best_true_global);
+void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR,FILE* p_file,vector<double>* p_best_true_global);
 void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum);
 
 class vehicle{
@@ -149,11 +149,11 @@ public:
 
 class parameters{
 public:
-    int num_agents = 4;
+    int num_agents = 10;
     int num_vehicles = num_agents; // 1 vehicle per agent
     int num_POI = 5*num_agents;
-    int pop_size = 4;
-    int num_waypoints = 7;
+    int pop_size = 500;
+    int num_waypoints = 8;
     
     double mutation_size = 5.0;
     
@@ -170,12 +170,12 @@ public:
     
     double percent_mutate = 50;
     
-    int STAT_RUNS = 1;
-    int GENERATIONS = 200;
+    int STAT_RUNS = 30;
+    int GENERATIONS = 100;
     bool allow_general_comm_link = true;
     
-    double P2P_commlink_dist = 300;
-    double maximum_observation_distance = 300;
+    double P2P_commlink_dist = 5;
+    double maximum_observation_distance = 5;
     
     void init();
     void single_agent_test_overwrite();
@@ -732,7 +732,12 @@ void tests::single_agent_multi_poi(){
     
     FILE* p_obj;
     p_obj=fopen("temp","a");
-    single_simulation(pA,pE,pPar,0,p_obj);
+    vector<double> temp_vec;
+    vector<double>* p_temp_vec= &temp_vec;
+    for (int i=0; i<1; i++) {
+        temp_vec.push_back(1);
+    }
+    single_simulation(pA,pE,pPar,0,p_obj,p_temp_vec);
     
     policy* pPol = &A.at(0).policies.at(0);
     if(P.maximum_observation_distance > 18){
@@ -778,7 +783,7 @@ void tests::single_agent_multi_poi(){
     A.at(0).start_simulation(pPar);
     A.at(0).select_fresh_policy();
     
-    single_simulation(pA,pE,pPar,0,p_obj);
+    single_simulation(pA,pE,pPar,0,p_obj,p_temp_vec);
     
     double L2 = pPol->local;
     
@@ -804,7 +809,7 @@ void tests::single_agent_multi_poi(){
     A.at(0).start_simulation(pPar);
     A.at(0).select_fresh_policy();
     
-    single_simulation(pA,pE,pPar,0,p_obj);
+    single_simulation(pA,pE,pPar,0,p_obj,p_temp_vec);
     fclose(p_obj);
     
     double L3 = pPol->local;
@@ -2095,19 +2100,33 @@ void tests::three_rover_not_surfacing(){
 
 ///////////////////// %%%%%%%%%%%%%%%%%% END CLASS FUNCTIONS %%%%%%%%%%%%%%%%%% /////////////////////
 
-void stat_run(vector<agent>*pA,environment* pE,parameters* pPar,int SR, FILE* p_file);
-void single_generation(vector<agent>*pA,environment* pE,parameters* pPar,int SR,int gen,FILE* p_file);
+void stat_run(vector<agent>*pA,environment* pE,parameters* pPar,int SR, FILE* p_file,vector<double>* p_best_true_global);
+void single_generation(vector<agent>*pA,environment* pE,parameters* pPar,int SR,int gen,FILE* p_file,vector<double>* p_best_true_global);
 void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen,FILE* p_file);
 void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum);
 
-void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR, FILE* p_file){
+void stat_run(vector<agent>*pA,environment* pE,parameters* pPar, int SR, FILE* p_file,vector<double>* p_best_true_global){
     cout << "STAT RUN\t\t" << SR << endl;
     for(int gen = 0; gen<pPar->GENERATIONS; gen++){
-        single_generation(pA,pE,pPar,SR,gen,p_file);
+        p_best_true_global->clear();
+        for (int rover_number=0; rover_number < pPar->num_agents; rover_number++) {
+            p_best_true_global->push_back(-999999.9999);
+        }
+        
+        single_generation(pA,pE,pPar,SR,gen,p_file,p_best_true_global);
+//        cout<<"best::"<<endl;
+//        for (int rover_number =0 ; rover_number < p_best_true_global->size(); rover_number++) {
+//            cout<<p_best_true_global->at(rover_number)<<"\t";
+//        }
+//        cout<<endl;
+        for (int rover_number =0; rover_number<1; rover_number++) {
+            fprintf(p_file,"%f \t ", p_best_true_global->at(rover_number));
+        }
+        p_best_true_global->clear();
     }
 }
 
-void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen,FILE* p_file){
+void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR, int gen,FILE* p_file,vector<double>* p_best_true_global){
     cout << "GENERATION\t" << SR << " :: " << gen << endl;
     for(int a=0; a<pPar->num_agents; a++){
         pA->at(a).start_generation();           //acts as a reset for entire population
@@ -2121,7 +2140,7 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
             pA->at(a).select_fresh_policy();
         }
         /// simulate based on selected policy.
-        single_simulation(pA, pE, pPar,gen,p_file);
+        single_simulation(pA, pE, pPar,gen,p_file,p_best_true_global);
         
     }
     /// DOWNSELECT
@@ -2136,7 +2155,7 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
             rand2 = rand()%pA->at(a).policies.size();
             while(rand2 == rand1){rand2 = rand()%pA->at(a).policies.size();}
             /// keep selecting rand2 until they are distinct.
-            int stat_run_case = 3;
+            int stat_run_case = 5;
             switch (stat_run_case) {
                 case 1:
                     fit1 = pA->at(a).policies.at(rand1).fitness;
@@ -2150,6 +2169,14 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
                     fit1 = pA->at(a).policies.at(rand1).true_difference;
                     fit2 = pA->at(a).policies.at(rand2).true_difference;
                     break;
+                case 4:
+                    fit1 = pA->at(a).policies.at(rand1).true_global;
+                    fit2 = pA->at(a).policies.at(rand2).true_global;
+                    break;
+                case 5:
+                    fit1 = pA->at(a).policies.at(rand1).limited_global;
+                    fit2 = pA->at(a).policies.at(rand2).limited_global;
+                    break;
                 default:
                     fit1 = pA->at(a).policies.at(rand1).fitness;
                     fit2 = pA->at(a).policies.at(rand2).fitness;
@@ -2157,7 +2184,7 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
             }
             //fit1 = pA->at(a).policies.at(rand1).fitness;
             //fit2 = pA->at(a).policies.at(rand2).fitness;
-                        if(fit1 > fit2){
+            if(fit1 > fit2){
                 /// kill2
                 pA->at(a).policies.erase(pA->at(a).policies.begin() + rand2);
             }
@@ -2186,7 +2213,7 @@ void single_generation(vector<agent>*pA,environment* pE,parameters* pPar, int SR
     }
 }
 
-void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen, FILE* p_file){
+void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int gen, FILE* p_file,vector<double>* p_best_true_global){
     for(int a=0; a<pPar->num_agents; a++){
         int dex = pA->at(a).active_policy_index;
         policy P = pA->at(a).policies.at(dex);
@@ -2208,9 +2235,14 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int ge
         pA->at(a).LGD_to_fitness(pA,pE,pPar);
     }
     
-
+    for (int rover_number =0; rover_number < pPar->num_agents ; rover_number++) {
+        int active = pA->at(rover_number).active_policy_index;
+        if (pA->at(rover_number).policies.at(active).true_global > p_best_true_global->at(rover_number)) {
+            p_best_true_global->at(rover_number) = pA->at(rover_number).policies.at(active).true_global;
+        }
+    }
     
-    for (int rover_number = 0 ; rover_number<pPar->num_agents; rover_number++) {
+    /*for (int rover_number = 0 ; rover_number<pPar->num_agents; rover_number++) {
         
         int active = pA->at(rover_number).active_policy_index;
         
@@ -2239,7 +2271,7 @@ void single_simulation(vector<agent>*pA,environment* pE,parameters* pPar, int ge
         fprintf(p_file, "\n");
         //cout<<endl;
         
-    }
+    }*/
     
     //fclose(p_file);
 }
@@ -2262,6 +2294,18 @@ void advance(vector<agent>*pA,environment* pE,parameters* pPar, int wpnum){
     }
 }
 
+void print_parameters(parameters* pPar){
+    FILE* p_file_parameter;
+    p_file_parameter = fopen("parameter.txt", "a");
+    fprintf(p_file_parameter, "Number of Agents :%d \n",pPar->num_agents);
+    fprintf(p_file_parameter, "Number of POI's :%d \n",pPar->num_POI);
+    fprintf(p_file_parameter, "Number of Way Points :%d \n",pPar->num_waypoints);
+    fprintf(p_file_parameter, "Policy Size :%d \n",pPar->pop_size);
+    fprintf(p_file_parameter,"Maximum Oberservation Distance :%f \n" ,pPar->maximum_observation_distance );
+    fprintf(p_file_parameter, "P2P Communication Distance :%f \n",pPar->P2P_commlink_dist);
+    fclose(p_file_parameter);
+}
+
 int main() {
     srand((unsigned)time(NULL));
     cout << "Start of Program" << endl;
@@ -2280,40 +2324,51 @@ int main() {
         T_obj.multi_agent_same_path_with_joy();    //communication
         T_obj.multi_agent_different_path_different_poi(); //They travel different path and look at different POI's
         T_obj.communication_test(); //They travel different path and look at different POI's
-       T_obj.three_agents_limited_joy();
+        T_obj.three_agents_limited_joy();
         T_obj.three_rover_not_surfacing();
     }
     
     if(!test_functions){
+        cout<<"Start Function!!"<<endl;
         parameters P;
         parameters* pPar = &P;
+        
         string date_time_stamp = "datetime";
-        
         FILE* p_file;
-        p_file = fopen("stat", "a");
+        p_file = fopen("stat.txt", "a");
         
-        vector<agent> Team;
-        vector<agent>* pA = &Team;
-        for(int a=0; a<pPar->num_agents; a++){
-            agent AA;
-            AA.init(pPar);
-            Team.push_back(AA);
-        }
-        assert(Team.size() == pPar->num_agents);
-        
-        environment E;
-        environment* pE = &E;
-        E.init(pPar);
-        
-        //// Assume team, environment have been initialized 10/19/16
-        
+        print_parameters(pPar);
         for(int i=0; i<pPar->STAT_RUNS; i++){
-            stat_run(pA,pE,pPar,i,p_file);
+            reset_id = true;
+            
+            vector<agent> Team;
+            vector<agent>* pA = &Team;
+            for(int a=0; a<pPar->num_agents; a++){
+                agent AA;
+                AA.init(pPar);
+                Team.push_back(AA);
+            }
+            assert(Team.size() == pPar->num_agents);
+            
+            environment E;
+            environment* pE = &E;
+            E.init(pPar);
+            
+            vector<double> best_true_global;
+            vector<double>* p_best_true_global = &best_true_global;
+            for (int rover_number=0; rover_number < pPar->num_agents; rover_number++) {
+                best_true_global.push_back(-999999.9999);
+            }
+            
+            //// Assume team, environment have been initialized 10/19/16
+            stat_run(pA,pE,pPar,i,p_file,p_best_true_global);
+            fprintf(p_file, "\n");
         }
         fclose(p_file);
-        
-        cout << "End of Program" << endl;
     }
+    
+    cout << "End of Program" << endl;
+    //}
     return 0;
 }
 
